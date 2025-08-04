@@ -63,20 +63,24 @@ def download_file(url, local_path):
         st.error(f"Error al descargar {url}: {e}")
         return False
 
-def download_efemerides(date, folder_path, download_precise, download_rapid):
+def download_efemerides(date, folder_path, download_precise, download_rapid, download_gfz):
     """
-    Descàrrega efemèrides precises i ràpides segons la selecció.
+    Descàrrega efemèrides precises, ràpides i GFZ segons la selecció.
     """
     gps_week, gps_week_number, day_of_year, year = calculate_gps_week_number(date)
     
     files_to_download = []
     if download_precise:
         precise_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/JAX0MGXFIN_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
-        files_to_download.append((precise_url, 'Precisas', 'gz'))
+        files_to_download.append((precise_url, 'Precisas JAX', 'gz'))
     
     if download_rapid:
         rapid_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
         files_to_download.append((rapid_url, 'Rápidas', 'Z'))
+
+    if download_gfz:
+        gfz_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/GFZ0OPSRAP_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
+        files_to_download.append((gfz_url, 'GFZ', 'gz'))
     
     download_info = []
 
@@ -108,15 +112,16 @@ st.sidebar.markdown("### 🗓️ Descargar Efemérides")
 selected_date = st.sidebar.date_input("Seleccionar fecha", datetime.today())
 download_precise = st.sidebar.checkbox("Descargar Efemérides Precisas JAX", value=True)
 download_rapid = st.sidebar.checkbox("Descargar Efemérides Rápidas", value=False)
+download_gfz = st.sidebar.checkbox("Descargar Efemérides GFZ", value=False) # Nueva opción para GFZ
 
 # Lògica de descàrrega integrada en el botó
 if st.sidebar.button("🔽 Descargar Efemérides"):
-    if not download_precise and not download_rapid:
+    if not download_precise and not download_rapid and not download_gfz:
         st.sidebar.warning("Por favor, selecciona al menos un tipo de efemérides para descargar.")
     else:
         with st.spinner("Descargando y procesando..."):
             tmpdir = tempfile.mkdtemp()
-            download_status = download_efemerides(selected_date, tmpdir, download_precise, download_rapid)
+            download_status = download_efemerides(selected_date, tmpdir, download_precise, download_rapid, download_gfz)
             
             st.subheader("Estado de la descarga:")
             
@@ -301,6 +306,7 @@ st.markdown("---")
 # Secció de suggeriments amb link mailto
 st.markdown("### 💬 Dejar una sugerencia")
 st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
+
 
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
