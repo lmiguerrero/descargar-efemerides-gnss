@@ -38,6 +38,10 @@ def build_brdc_url(date):
     Construye la URL para descargar el archivo de efemérides BRDC de IGS.
     """
     try:
+        # Convertir `date` a `datetime` si es necesario
+        if isinstance(date, datetime.date):
+            date = datetime.combine(date, datetime.min.time())
+            
         year = date.strftime('%Y')
         doy = date.strftime('%j')
         base_url = f"https://igs.bkg.bund.de/root_ftp/IGS/BRDC/{year}/{doy}/"
@@ -52,6 +56,10 @@ def build_precise_rapid_urls(date):
     Construye las URLs para descargar efemérides precisas y rápidas.
     """
     try:
+        # Convertir `date` a `datetime` si es necesario
+        if isinstance(date, datetime.date):
+            date = datetime.combine(date, datetime.min.time())
+
         gps_week, gps_day = gps_day_from_date(date)
         day_of_year = date.timetuple().tm_yday
         year = date.year
