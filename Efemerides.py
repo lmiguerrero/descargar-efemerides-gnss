@@ -1,69 +1,125 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+from geopy.distance import geodesic
+import requests
 import os
-from ftplib import FTP
-from datetime import datetime
-import tkinter as tk
-from tkinter import messagebox, filedialog
+import gzip
+import shutil
+import tempfile
 
-# Función para calcular el número de semana GPS y el número de semana GPS
-def calculate_gps_week_number(date):
-    date_format = "%d-%m-%Y"
-    target_date = datetime.strptime(date, date_format)
-    gps_start_date = datetime(1980, 1, 6)  # Fecha de inicio del sistema GPS
-    days_since_start = (target_date - gps_start_date).days
-    gps_week = days_since_start // 7  # Calcula el número de semana GPS
-    gps_day_of_week = days_since_start % 7  # Calcula el día dentro de la semana GPS
-    gps_week_number = gps_week * 10 + gps_day_of_week  # Calcula el número de semana GPS
-    return gps_week, gps_week_number
+# Título principal
+st.set_page_config(page_title="GNSS Tool - Efemérides y Estaciones Cercanas", layout="centered")
+st.title("📡 Herramienta GNSS - Consulta y Descarga de Efemérides IGS")
 
-# Función para descargar las efemérides desde el servidor FTP
-def download_efemerides(date, file_path):
-    gps_week, gps_week_number = calculate_gps_week_number(date)
-    ftp_url = f"ftp://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
-    ftp_host = "lox.ucsd.edu"
-    ftp_path = f"/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
+st.markdown("---")
 
-    try:
-        ftp = FTP(ftp_host)  # Conecta al servidor FTP
-        ftp.login()  # Inicia sesión en el servidor FTP
-        with open(file_path, 'wb') as local_file:
-            ftp.retrbinary(f"RETR {ftp_path}", local_file.write)  # Descarga el archivo
-        ftp.quit()  # Cierra la conexión FTP
-        # Muestra un mensaje de éxito con el número de semana GPS calculado
-        messagebox.showinfo("Descarga Completa", f"Efemérides descargadas como {file_path}\n\nSe han descargado las efemérides para el GPS Week Number calculado: {gps_week_number}")
-    except Exception as e:
-        # Muestra un mensaje de error si no se pudo descargar el archivo
-        messagebox.showerror("Error", f"No se pudo descargar las efemérides. Error: {str(e)}")
+# Función para calcular el nombre del archivo SP3 y el día GPS
+def gps_day_from_date(date):
+    gps_start = datetime(1980, 1, 6)
+    delta = date - gps_start
+    gps_week = delta.days // 7
+    gps_day = delta.days % 7
+    return gps_week, gps_day
 
-# Función que inicia el proceso de descarga
-def start_download():
-    date = date_entry.get()  # Obtiene la fecha ingresada por el usuario
-    # Abre un cuadro de diálogo para seleccionar la ubicación de guardado del archivo
-    file_path = filedialog.asksaveasfilename(defaultextension=".sp3.Z", filetypes=[("SP3 files", "*.sp3.Z")])
-    if file_path:
-        download_efemerides(date, file_path)  # Llama a la función para descargar las efemérides
+def build_igs_url(date):
+    gps_week, gps_day = gps_day_from_date(date)
+    year = date.strftime('%Y')
+    doy = date.strftime('%j')
+    base_url = f"https://igs.bkg.bund.de/root_ftp/IGS/BRDC/{year}/{doy}/"
+    file_name = f"brdc{doy}0.{str(date.year)[2:]}n.gz"
+    return base_url + file_name, file_name
 
-# Configuración de la interfaz gráfica
-root = tk.Tk()
-root.title("Descargar Efemérides GNSS")
+def download_and_extract_sp3(url, filename):
+    tmpdir = tempfile.mkdtemp()
+    filepath = os.path.join(tmpdir, filename)
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None, None
+    with open(filepath, 'wb') as f:
+        f.write(r.content)
+    extracted = filepath[:-3]
+    with gzip.open(filepath, 'rb') as f_in, open(extracted, 'wb') as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    return extracted, filename[:-3]
 
-# Etiqueta y campo de entrada para la fecha
-tk.Label(root, text="Ingrese la fecha (DD-MM-YYYY):").pack(pady=10)
-date_entry = tk.Entry(root)
-date_entry.pack(pady=5)
+# ---- SIDEBAR INPUTS ----
+st.sidebar.header("📥 Ingresar parámetros")
 
-# Botón para iniciar la descarga
-download_button = tk.Button(root, text="Descargar", command=start_download)
-download_button.pack(pady=20)
+# Fecha para efemérides
+selected_date = st.sidebar.date_input("Seleccionar fecha para efemérides IGS", datetime.today())
 
-# Etiqueta con el nombre y título
-tk.Label(root, text="Miguel Guerrero Ing Topográfico UD", font=("Arial", 8)).pack(pady=10)
+# Coordenadas
+st.sidebar.markdown("### 📍 Coordenadas para búsqueda de estaciones")
+coord_format = st.sidebar.selectbox("Formato de coordenadas", ["Decimal Geográficas", "Magna-SIRGAS (Este, Norte)"])
 
-# Inicia el bucle principal de la interfaz gráfica
-root.mainloop()
+if coord_format == "Decimal Geográficas":
+    lat = st.sidebar.number_input("Latitud", format="%.8f")
+    lon = st.sidebar.number_input("Longitud", format="%.8f")
+    user_coord = (lat, lon)
+else:
+    este = st.sidebar.number_input("Este (X)", format="%.2f")
+    norte = st.sidebar.number_input("Norte (Y)", format="%.2f")
+    import pyproj
+    proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
+    lon, lat = proj.transform(este, norte)
+    user_coord = (lat, lon)
 
+num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
+
+# ---- EFEMÉRIDES ----
+st.subheader("📥 Descargar Efemérides SP3 (IGS)")
+
+url, filename = build_igs_url(selected_date)
+st.markdown(f"**URL del archivo comprimido (.gz):** [Abrir enlace]({url})")
+
+if st.button("🔽 Descargar y descomprimir archivo .sp3"):
+    with st.spinner("Descargando y descomprimiendo..."):
+        extracted_path, extracted_name = download_and_extract_sp3(url, filename)
+        if extracted_path:
+            with open(extracted_path, "rb") as file:
+                st.download_button(label="📄 Descargar archivo SP3", data=file, file_name=extracted_name)
+        else:
+            st.error("No se pudo descargar el archivo. Revisa la fecha o intenta más tarde.")
+
+# ---- ESTACIONES CERCANAS ----
+st.subheader("🗺️ Estaciones GNSS más cercanas")
+
+st.markdown("Las estaciones cercanas se calculan con base en un conjunto de coordenadas de referencia.")
+
+csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
+df = pd.read_csv(csv_url)
+
+df["Coord"] = list(zip(df["Norte"], df["Este"]))
+df["LatLon"] = df["Coord"].apply(lambda x: pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True).transform(x[1], x[0]))
+df["Distancia_km"] = df["LatLon"].apply(lambda x: geodesic(user_coord, (x[1], x[0])).kilometers)
+df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
+
+st.markdown("### 📌 Estaciones más cercanas:")
+
+for idx, row in df_sorted.iterrows():
+    nombre = row["Nombre Municipio"]
+    dpto = row["Nombre Departamento"]
+    lat, lon = row["LatLon"]
+    dist = row["Distancia_km"]
+    enlace = f"https://geoportal.igac.gov.co/sites/geoportal.igac.gov.co/files/archivos_gdb/GNSS/{nombre.replace(' ', '%20')}.zip"
+    st.markdown(f"- **{nombre}, {dpto}** – {dist:.2f} km – [Descargar GNSS]({enlace})")
+
+# Mapa (opcional)
+st.markdown("### 🗺️ Ver mapa de estaciones")
+import pydeck as pdk
+
+layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=df_sorted,
+    get_position="LatLon",
+    get_radius=3000,
+    get_fill_color=[180, 0, 200, 140],
+    pickable=True,
+)
+
+view_state = pdk.ViewState(latitude=user_coord[0], longitude=user_coord[1], zoom=6)
+st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state))
+
+st.success("✅ Aplicación lista")
