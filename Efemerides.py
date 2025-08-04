@@ -276,5 +276,5 @@ if st.button("🗺️ Generar Mapa"):
         st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
         st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido, y de que el archivo contiene las columnas 'Latitud' y 'Longitud'.")
 
-st.success("✅ Aplicación lista")
-
+st.markdown("---")
+st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
