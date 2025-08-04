@@ -195,18 +195,28 @@ else:
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
 # Opciones de fondo de mapa para pydeck
-# Usamos un diccionario para mapear nombres amigables a URLs de servidores de azulejos
-MAP_STYLES = {
-    "Fondo Claro (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png",
-    "Fondo Oscuro (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png",
-    "Satélite (Esri)": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "Mapas de Carreteras (OpenStreetMap)": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    "Relieve (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png"
+# Diccionario que separa los estilos de mapas nativos y los que usan TileLayer
+MAP_STYLES_NATIVE = {
+    "Fondo Claro (Predeterminado)": "light",
+    "Fondo Oscuro": "dark",
+    "Satélite": "satellite",
+    "Carreteras": "road"
 }
+
+MAP_STYLES_TILES = {
+    "CartoDB Claro (Positron)": "https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
+    "CartoDB Oscuro (Dark Matter)": "https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png",
+    "Satélite (Esri)": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "Relieve (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png",
+    "Mapas de Carreteras (OpenStreetMap)": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+}
+
+# Unimos ambos diccionarios para el selectbox
+MAP_STYLES = {**MAP_STYLES_NATIVE, **MAP_STYLES_TILES}
 
 # Selector de fondo de mapa en la barra lateral
 selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()), index=0)
-selected_map_style_url = MAP_STYLES[selected_map_style_name]
+selected_map_style_value = MAP_STYLES[selected_map_style_name]
 
 
 # ---- CONTENIDO PRINCIPAL ----
@@ -275,71 +285,70 @@ if st.button("🗺️ Generar Mapa"):
                 "distance": [0.0]
             })
 
-            # Creamos la capa base del mapa si no es uno de los estilos nativos
-            base_map_layer = None
-            if selected_map_style_url not in ["light", "dark", "satellite", "road"]:
-                base_map_layer = pdk.Layer(
+            # Creamos las capas
+            layers = []
+            
+            # Lógica para determinar el estilo del mapa y agregar la capa de fondo
+            map_style_to_use = None
+            if selected_map_style_name in MAP_STYLES_NATIVE:
+                # Si es un estilo nativo de Pydeck, lo usamos directamente en el map_style del Deck
+                map_style_to_use = selected_map_style_value
+            elif selected_map_style_name in MAP_STYLES_TILES:
+                # Si es un estilo de servidor de azulejos, creamos una capa TileLayer
+                tile_layer = pdk.Layer(
                     "TileLayer",
-                    data=selected_map_style_url,
-                    tooltip={
-                        "html": "{x}, {y}, {z}",
-                        "style": {"color": "white"}
-                    }
+                    data=selected_map_style_value
                 )
+                layers.append(tile_layer)
 
-            # Crea la capa de puntos para las estaciones
-            station_layer = pdk.Layer(
+            # Agregamos las capas de puntos y etiquetas a la lista
+            layers.append(pdk.Layer(
                 "ScatterplotLayer",
                 data=station_map_data,
                 get_position=["lon", "lat"],
                 get_radius=3000,
-                get_fill_color=[255, 140, 0, 200],  # Color naranja para las estaciones
+                get_fill_color=[255, 140, 0, 200],
                 pickable=True,
                 tooltip={
                     "html": "<b>ID:</b> {id}<br/><b>Municipio:</b> {name}<br/><b>Departamento:</b> {department}",
                     "style": {"color": "white"}
                 }
-            )
+            ))
 
-            # Crea la capa de etiquetas de texto para los IDs de las estaciones
-            text_layer = pdk.Layer(
+            layers.append(pdk.Layer(
                 "TextLayer",
                 data=station_map_data,
                 get_position=["lon", "lat"],
                 get_text="id",
-                get_color=[0, 0, 0, 255], # Color negro para el texto
+                get_color=[0, 0, 0, 255],
                 get_size=10,
                 get_alignment_baseline="'bottom'",
                 get_pixel_offset=[0, -10],
-            )
+            ))
             
-            # Crea la capa de puntos para la ubicación del usuario con transparencia
-            user_layer = pdk.Layer(
+            layers.append(pdk.Layer(
                 "ScatterplotLayer",
                 data=user_point_df,
                 get_position=["lon", "lat"],
-                get_radius=5000, # Un poco más grande para destacarlo
-                get_fill_color=[255, 0, 0, 150], # Color rojo con transparencia para la ubicación del usuario
+                get_radius=5000,
+                get_fill_color=[255, 0, 0, 150],
                 pickable=True,
                 tooltip={"text": "{name}"}
-            )
+            ))
 
             # Configura el estado inicial de la vista del mapa, centrado en el usuario
             view_state = pdk.ViewState(
                 latitude=user_coord[0],
                 longitude=user_coord[1],
                 zoom=6,
-                pitch=0  # Vista plana
+                pitch=0
             )
-
-            # Combina todas las capas, poniendo el mapa base al principio
-            layers = [layer for layer in [base_map_layer, station_layer, text_layer, user_layer] if layer is not None]
 
             # Muestra el mapa en la aplicación
             st.pydeck_chart(pdk.Deck(
                 layers=layers, 
                 initial_view_state=view_state,
-                map_style=None if base_map_layer else "light"
+                map_style=map_style_to_use
             ))
 
         else:
@@ -353,5 +362,6 @@ st.markdown("---")
 # Sección de sugerencias con enlace 'mailto'
 st.markdown("### 💬 Dejar una sugerencia")
 st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
+
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
