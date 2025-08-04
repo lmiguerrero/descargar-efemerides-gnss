@@ -254,3 +254,4 @@ except Exception as e:
     st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido.")
 
 st.success("✅ Aplicación lista")
+
