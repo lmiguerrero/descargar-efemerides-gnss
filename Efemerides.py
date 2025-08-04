@@ -227,24 +227,35 @@ if st.button("🗺️ Generar Mapa"):
                 "name": df_sorted["Nombre Municipio"],
                 "distance": df_sorted["Distancia_km"]
             })
+            
+            # Agrega la coordenada del usuario al mapa para que aparezca como un punto diferente
+            user_point_df = pd.DataFrame({
+                "lat": [user_coord[0]],
+                "lon": [user_coord[1]],
+                "name": ["Ubicación del Usuario"],
+                "distance": [0.0]
+            })
 
-            # Agrega la coordenada del usuario al mapa
-            map_data.loc[len(map_data)] = {
-                "lat": user_coord[0],
-                "lon": user_coord[1],
-                "name": "Ubicación del Usuario",
-                "distance": 0.0
-            }
-
-            # Crea la capa de puntos
-            layer = pdk.Layer(
+            # Crea la capa de puntos para las estaciones
+            station_layer = pdk.Layer(
                 "ScatterplotLayer",
                 data=map_data,
                 get_position=["lon", "lat"],
                 get_radius=3000,
-                get_fill_color=[255, 140, 0, 200],
+                get_fill_color=[255, 140, 0, 200],  # Color para las estaciones
                 pickable=True,
                 tooltip={"text": "{name}\nDistancia: {distance:.2f} km"}
+            )
+            
+            # Crea la capa de puntos para la ubicación del usuario
+            user_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=user_point_df,
+                get_position=["lon", "lat"],
+                get_radius=5000, # Un poco más grande para que se note
+                get_fill_color=[255, 0, 0, 255], # Rojo brillante para la ubicación del usuario
+                pickable=True,
+                tooltip={"text": "{name}"}
             )
 
             # Configura el estado inicial de la vista del mapa
@@ -252,13 +263,14 @@ if st.button("🗺️ Generar Mapa"):
                 latitude=user_coord[0],
                 longitude=user_coord[1],
                 zoom=6,
-                pitch=45
+                pitch=0 # Configurado para que la vista sea plana
             )
             
             # Muestra el mapa en la aplicación
             st.pydeck_chart(pdk.Deck(
-                layers=[layer], 
+                layers=[station_layer, user_layer], 
                 initial_view_state=view_state,
+                map_style="mapbox://styles/mapbox/satellite-v9", # Fondo satelital
                 tooltip={"html": "<b>{name}</b><br/>Distancia: {distance:.2f} km", "style": {"color": "white"}}
             ))
 
