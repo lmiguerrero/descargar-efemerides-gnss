@@ -242,7 +242,7 @@ if st.button("🗺️ Generar Mapa"):
                 get_fill_color=[255, 140, 0, 200],  # Color para las estaciones
                 pickable=True,
                 tooltip={
-                    "html": "<b>Departamento:</b> {department}<br/><b>Municipio:</b> {name}<br/><b>Estación:</b> {id}<br/><b>Distancia:</b> {distance:.2f} km",
+                    "html": "<b>ID:</b> {id}<br/><b>Municipio:</b> {name}<br/><b>Departamento:</b> {department}",
                     "style": {"color": "white"}
                 }
             )
@@ -270,8 +270,7 @@ if st.button("🗺️ Generar Mapa"):
             st.pydeck_chart(pdk.Deck(
                 layers=[station_layer, user_layer], 
                 initial_view_state=view_state,
-                map_style="light", # Fondo de OpenStreetMap
-                tooltip={"html": "<b>{name}</b><br/>Distancia: {distance:.2f} km", "style": {"color": "white"}}
+                map_style="light" # Fondo de OpenStreetMap
             ))
 
         else:
