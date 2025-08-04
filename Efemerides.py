@@ -169,89 +169,93 @@ num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 st.subheader("🗺️ Estaciones GNSS más cercanas")
 st.markdown("Las estaciones cercanas se calculan con base en un conjunto de coordenadas de referencia.")
 
-# Carga de datos de las estaciones
-csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
-try:
-    df = pd.read_csv(csv_url)
-    
-    if user_coord is not None:
-        # Lógica de cálculo de distancia y ordenamiento
-        transformer_4326_to_3116 = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3116", always_xy=True)
+# Botón para generar el mapa
+if st.button("🗺️ Generar Mapa"):
+    # Carga de datos de las estaciones
+    csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
+    try:
+        df = pd.read_csv(csv_url)
         
-        # Convertir coordenadas del CSV a Lat/Lon para el cálculo de distancia geodesic
-        df['LatLon'] = df.apply(
-            lambda row: transformer_4326_to_3116.transform(row['Este'], row['Norte'], direction='INVERSE'), axis=1
-        )
-        
-        df["Distancia_km"] = df["LatLon"].apply(
-            lambda x: geodesic(user_coord, (x[1], x[0])).kilometers
-        )
-        df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
-        
-        # Crear la tabla con los datos
-        st.markdown("### 📌 Estaciones más cercanas:")
-        
-        # Crear un DataFrame para la tabla con los datos que se van a mostrar
-        table_df = df_sorted[['ID', 'Nombre Municipio', 'Nombre Departamento', 'Norte', 'Este', 'Distancia_km']].copy()
-        
-        # Formatear la columna de distancia para mostrar solo 2 decimales
-        table_df['Distancia_km'] = table_df['Distancia_km'].apply(lambda x: f"{x:.2f} km")
+        if user_coord is not None:
+            # Lógica de cálculo de distancia y ordenamiento
+            transformer_4326_to_3116 = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3116", always_xy=True)
+            
+            # Convertir coordenadas del CSV a Lat/Lon para el cálculo de distancia geodesic
+            df['LatLon'] = df.apply(
+                lambda row: transformer_4326_to_3116.transform(row['Este'], row['Norte'], direction='INVERSE'), axis=1
+            )
+            
+            df["Distancia_km"] = df["LatLon"].apply(
+                lambda x: geodesic(user_coord, (x[1], x[0])).kilometers
+            )
+            df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
+            
+            # Crear la tabla con los datos
+            st.markdown("### 📌 Estaciones más cercanas:")
+            
+            # Crear un DataFrame para la tabla con los datos que se van a mostrar
+            table_df = df_sorted[['ID', 'Nombre Municipio', 'Nombre Departamento', 'Norte', 'Este', 'Distancia_km']].copy()
+            
+            # Formatear la columna de distancia para mostrar solo 2 decimales
+            table_df['Distancia_km'] = table_df['Distancia_km'].apply(lambda x: f"{x:.2f} km")
 
-        # Convertir la columna ID a hipervínculos
-        base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
-        table_df['ID'] = table_df['ID'].apply(lambda alias: f"[{alias}]({base_url}{alias})")
+            # Convertir la columna ID a hipervínculos
+            base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
+            table_df['ID'] = table_df['ID'].apply(lambda alias: f"[{alias}]({base_url}{alias})")
 
-        # Mostrar la tabla en Streamlit
-        st.markdown(table_df.to_markdown(index=False), unsafe_allow_html=True)
+            # Mostrar la tabla en Streamlit
+            st.markdown(table_df.to_markdown(index=False), unsafe_allow_html=True)
 
-        # Código del mapa
-        st.markdown("### 🗺️ Ver mapa de estaciones")
-        
-        # Mapea las columnas para pydeck
-        map_data = pd.DataFrame({
-            "lat": df_sorted["LatLon"].apply(lambda x: x[1]),
-            "lon": df_sorted["LatLon"].apply(lambda x: x[0]),
-            "name": df_sorted["Nombre Municipio"],
-            "distance": df_sorted["Distancia_km"]
-        })
+            # Código del mapa
+            st.markdown("### 🗺️ Ver mapa de estaciones")
+            
+            # Mapea las columnas para pydeck
+            map_data = pd.DataFrame({
+                "lat": df_sorted["LatLon"].apply(lambda x: x[1]),
+                "lon": df_sorted["LatLon"].apply(lambda x: x[0]),
+                "name": df_sorted["Nombre Municipio"],
+                "distance": df_sorted["Distancia_km"]
+            })
 
-        # Agrega la coordenada del usuario al mapa
-        map_data.loc[len(map_data)] = {
-            "lat": user_coord[0],
-            "lon": user_coord[1],
-            "name": "Ubicación del Usuario",
-            "distance": 0.0
-        }
+            # Agrega la coordenada del usuario al mapa
+            map_data.loc[len(map_data)] = {
+                "lat": user_coord[0],
+                "lon": user_coord[1],
+                "name": "Ubicación del Usuario",
+                "distance": 0.0
+            }
 
-        # Crea la capa de puntos
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=map_data,
-            get_position=["lon", "lat"],
-            get_radius=3000,
-            get_fill_color=[255, 140, 0, 200],
-            pickable=True,
-            tooltip={"text": "{name}\nDistancia: {distance:.2f} km"}
-        )
+            # Crea la capa de puntos
+            layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=map_data,
+                get_position=["lon", "lat"],
+                get_radius=3000,
+                get_fill_color=[255, 140, 0, 200],
+                pickable=True,
+                tooltip={"text": "{name}\nDistancia: {distance:.2f} km"}
+            )
 
-        # Configura el estado inicial de la vista del mapa
-        view_state = pdk.ViewState(
-            latitude=user_coord[0],
-            longitude=user_coord[1],
-            zoom=6,
-            pitch=45
-        )
-        
-        # Muestra el mapa en la aplicación
-        st.pydeck_chart(pdk.Deck(
-            layers=[layer], 
-            initial_view_state=view_state,
-            tooltip={"html": "<b>{name}</b><br/>Distancia: {distance:.2f} km", "style": {"color": "white"}}
-        ))
+            # Configura el estado inicial de la vista del mapa
+            view_state = pdk.ViewState(
+                latitude=user_coord[0],
+                longitude=user_coord[1],
+                zoom=6,
+                pitch=45
+            )
+            
+            # Muestra el mapa en la aplicación
+            st.pydeck_chart(pdk.Deck(
+                layers=[layer], 
+                initial_view_state=view_state,
+                tooltip={"html": "<b>{name}</b><br/>Distancia: {distance:.2f} km", "style": {"color": "white"}}
+            ))
 
-except Exception as e:
-    st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
-    st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido.")
+        else:
+            st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
+
+    except Exception as e:
+        st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
+        st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido.")
 
 st.success("✅ Aplicación lista")
-
