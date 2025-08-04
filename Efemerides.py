@@ -1,22 +1,32 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from geopy.distance import geodesic
 import requests
 import os
 import gzip
 import shutil
 import tempfile
+import pyproj
+import pydeck as pdk
 
-# Título principal
-st.set_page_config(page_title="GNSS Tool - Efemérides y Estaciones Cercanas", layout="centered")
+# Configuración de la página
+st.set_page_config(
+    page_title="Herramienta GNSS",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Título principal de la aplicación
 st.title("📡 Herramienta GNSS - Consulta y Descarga de Efemérides IGS")
-
 st.markdown("---")
 
-# Función para calcular el nombre del archivo SP3 y el día GPS
+# Función para calcular el día GPS
 def gps_day_from_date(date):
+    """
+    Calcula la semana y el día GPS a partir de una fecha.
+    """
     gps_start = datetime(1980, 1, 6)
     delta = date - gps_start
     gps_week = delta.days // 7
@@ -24,102 +34,193 @@ def gps_day_from_date(date):
     return gps_week, gps_day
 
 def build_igs_url(date):
-    gps_week, gps_day = gps_day_from_date(date)
-    year = date.strftime('%Y')
-    doy = date.strftime('%j')
-    base_url = f"https://igs.bkg.bund.de/root_ftp/IGS/BRDC/{year}/{doy}/"
-    file_name = f"brdc{doy}0.{str(date.year)[2:]}n.gz"
-    return base_url + file_name, file_name
+    """
+    Construye la URL para descargar el archivo de efemérides de IGS.
+    """
+    try:
+        gps_week, gps_day = gps_day_from_date(date)
+        year = date.strftime('%Y')
+        doy = date.strftime('%j')
+        base_url = f"https://igs.bkg.bund.de/root_ftp/IGS/BRDC/{year}/{doy}/"
+        # Ajuste del nombre del archivo para coincidir con el formato real
+        file_name = f"brdc{doy}0.{str(date.year)[2:]}n.gz"
+        return base_url + file_name, file_name
+    except Exception as e:
+        st.error(f"Error al construir la URL: {e}")
+        return None, None
 
 def download_and_extract_sp3(url, filename):
+    """
+    Descarga y extrae el archivo SP3 de la URL proporcionada.
+    """
+    if url is None or filename is None:
+        return None, None
+    
+    # Crea un directorio temporal para la descarga
     tmpdir = tempfile.mkdtemp()
     filepath = os.path.join(tmpdir, filename)
-    r = requests.get(url)
-    if r.status_code != 200:
+    
+    try:
+        # Realiza la solicitud HTTP para descargar el archivo
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            st.warning(f"No se pudo encontrar el archivo en la URL. Código de estado: {r.status_code}")
+            return None, None
+        
+        # Escribe el contenido en el archivo temporal
+        with open(filepath, 'wb') as f:
+            f.write(r.content)
+            
+        # Descomprime el archivo
+        extracted = filepath[:-3]
+        with gzip.open(filepath, 'rb') as f_in, open(extracted, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+            
+        return extracted, filename[:-3]
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error de conexión al intentar descargar el archivo: {e}")
         return None, None
-    with open(filepath, 'wb') as f:
-        f.write(r.content)
-    extracted = filepath[:-3]
-    with gzip.open(filepath, 'rb') as f_in, open(extracted, 'wb') as f_out:
-        shutil.copyfileobj(f_in, f_out)
-    return extracted, filename[:-3]
+    except Exception as e:
+        st.error(f"Error al procesar el archivo: {e}")
+        return None, None
 
 # ---- SIDEBAR INPUTS ----
 st.sidebar.header("📥 Ingresar parámetros")
 
-# Fecha para efemérides
+# Sección para descargar efemérides
+st.sidebar.markdown("### 🗓️ Descargar Efemérides")
 selected_date = st.sidebar.date_input("Seleccionar fecha para efemérides IGS", datetime.today())
+url, filename = build_igs_url(selected_date)
+if url:
+    st.sidebar.markdown(f"**URL del archivo comprimido:** [Abrir enlace]({url})")
 
-# Coordenadas
+if st.sidebar.button("🔽 Descargar y descomprimir archivo .sp3"):
+    if url:
+        with st.spinner("Descargando y descomprimiendo..."):
+            extracted_path, extracted_name = download_and_extract_sp3(url, filename)
+            if extracted_path:
+                with open(extracted_path, "rb") as file:
+                    st.download_button(
+                        label="📄 Descargar archivo SP3", 
+                        data=file, 
+                        file_name=extracted_name,
+                        mime="application/octet-stream"
+                    )
+                st.success("✅ Descarga y descompresión completada.")
+                # Limpiar el archivo temporal
+                shutil.rmtree(os.path.dirname(extracted_path))
+            else:
+                st.error("No se pudo descargar o procesar el archivo. Revisa la fecha o intenta más tarde.")
+    else:
+        st.error("No se pudo construir la URL de descarga. Revisa la fecha seleccionada.")
+
+st.sidebar.markdown("---")
+
+# Sección para buscar estaciones
 st.sidebar.markdown("### 📍 Coordenadas para búsqueda de estaciones")
-coord_format = st.sidebar.selectbox("Formato de coordenadas", ["Decimal Geográficas", "Magna-SIRGAS (Este, Norte)"])
+coord_format = st.sidebar.selectbox(
+    "Formato de coordenadas",
+    ["Decimal Geográficas", "Magna-SIRGAS (Este, Norte)"]
+)
 
+user_coord = None
 if coord_format == "Decimal Geográficas":
     lat = st.sidebar.number_input("Latitud", format="%.8f")
     lon = st.sidebar.number_input("Longitud", format="%.8f")
-    user_coord = (lat, lon)
+    if lat != 0.0 or lon != 0.0:
+        user_coord = (lat, lon)
 else:
     este = st.sidebar.number_input("Este (X)", format="%.2f")
     norte = st.sidebar.number_input("Norte (Y)", format="%.2f")
-    import pyproj
-    proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
-    lon, lat = proj.transform(este, norte)
-    user_coord = (lat, lon)
+    if este != 0.0 or norte != 0.0:
+        try:
+            proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
+            lon_decimal, lat_decimal = proj.transform(este, norte)
+            user_coord = (lat_decimal, lon_decimal)
+        except Exception as e:
+            st.error(f"Error en la conversión de coordenadas: {e}")
 
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
-# ---- EFEMÉRIDES ----
-st.subheader("📥 Descargar Efemérides SP3 (IGS)")
-
-url, filename = build_igs_url(selected_date)
-st.markdown(f"**URL del archivo comprimido (.gz):** [Abrir enlace]({url})")
-
-if st.button("🔽 Descargar y descomprimir archivo .sp3"):
-    with st.spinner("Descargando y descomprimiendo..."):
-        extracted_path, extracted_name = download_and_extract_sp3(url, filename)
-        if extracted_path:
-            with open(extracted_path, "rb") as file:
-                st.download_button(label="📄 Descargar archivo SP3", data=file, file_name=extracted_name)
-        else:
-            st.error("No se pudo descargar el archivo. Revisa la fecha o intenta más tarde.")
-
-# ---- ESTACIONES CERCANAS ----
+# ---- CONTENIDO PRINCIPAL ----
 st.subheader("🗺️ Estaciones GNSS más cercanas")
-
 st.markdown("Las estaciones cercanas se calculan con base en un conjunto de coordenadas de referencia.")
 
+# Carga de datos de las estaciones
 csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
-df = pd.read_csv(csv_url)
+try:
+    df = pd.read_csv(csv_url)
+    
+    if user_coord is not None:
+        # Lógica de cálculo de distancia y ordenamiento
+        transformer_4326_to_3116 = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3116", always_xy=True)
+        
+        # Convertir coordenadas del CSV a Lat/Lon para el cálculo de distancia geodesic
+        df['LatLon'] = df.apply(
+            lambda row: transformer_4326_to_3116.transform(row['Este'], row['Norte'], direction='INVERSE'), axis=1
+        )
+        
+        df["Distancia_km"] = df["LatLon"].apply(
+            lambda x: geodesic(user_coord, (x[1], x[0])).kilometers
+        )
+        df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
 
-df["Coord"] = list(zip(df["Norte"], df["Este"]))
-df["LatLon"] = df["Coord"].apply(lambda x: pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True).transform(x[1], x[0]))
-df["Distancia_km"] = df["LatLon"].apply(lambda x: geodesic(user_coord, (x[1], x[0])).kilometers)
-df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
+        st.markdown("### 📌 Estaciones más cercanas:")
+        for idx, row in df_sorted.iterrows():
+            nombre = row["Nombre Municipio"]
+            dpto = row["Nombre Departamento"]
+            lat, lon = row["LatLon"]
+            dist = row["Distancia_km"]
+            enlace = f"https://geoportal.igac.gov.co/sites/geoportal.igac.gov.co/files/archivos_gdb/GNSS/{nombre.replace(' ', '%20')}.zip"
+            st.markdown(f"- **{nombre}, {dpto}** – {dist:.2f} km – [Descargar GNSS]({enlace})")
 
-st.markdown("### 📌 Estaciones más cercanas:")
+        # Mapa de estaciones
+        st.markdown("### 🗺️ Ver mapa de estaciones")
+        
+        # Mapea las columnas para pydeck
+        map_data = pd.DataFrame({
+            "lat": df_sorted["LatLon"].apply(lambda x: x[1]),
+            "lon": df_sorted["LatLon"].apply(lambda x: x[0]),
+            "name": df_sorted["Nombre Municipio"],
+            "distance": df_sorted["Distancia_km"]
+        })
 
-for idx, row in df_sorted.iterrows():
-    nombre = row["Nombre Municipio"]
-    dpto = row["Nombre Departamento"]
-    lat, lon = row["LatLon"]
-    dist = row["Distancia_km"]
-    enlace = f"https://geoportal.igac.gov.co/sites/geoportal.igac.gov.co/files/archivos_gdb/GNSS/{nombre.replace(' ', '%20')}.zip"
-    st.markdown(f"- **{nombre}, {dpto}** – {dist:.2f} km – [Descargar GNSS]({enlace})")
+        # Agrega la coordenada del usuario al mapa
+        map_data.loc[len(map_data)] = {
+            "lat": user_coord[0],
+            "lon": user_coord[1],
+            "name": "Ubicación del Usuario",
+            "distance": 0.0
+        }
 
-# Mapa (opcional)
-st.markdown("### 🗺️ Ver mapa de estaciones")
-import pydeck as pdk
+        # Crea la capa de puntos
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=map_data,
+            get_position=["lon", "lat"],
+            get_radius=3000,
+            get_fill_color=[255, 140, 0, 200],
+            pickable=True,
+            tooltip={"text": "{name}\nDistancia: {distance:.2f} km"}
+        )
 
-layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=df_sorted,
-    get_position="LatLon",
-    get_radius=3000,
-    get_fill_color=[180, 0, 200, 140],
-    pickable=True,
-)
+        # Configura el estado inicial de la vista del mapa
+        view_state = pdk.ViewState(
+            latitude=user_coord[0],
+            longitude=user_coord[1],
+            zoom=6,
+            pitch=45
+        )
+        
+        # Muestra el mapa en la aplicación
+        st.pydeck_chart(pdk.Deck(
+            layers=[layer], 
+            initial_view_state=view_state,
+            tooltip={"html": "<b>{name}</b><br/>Distancia: {distance:.2f} km", "style": {"color": "white"}}
+        ))
 
-view_state = pdk.ViewState(latitude=user_coord[0], longitude=user_coord[1], zoom=6)
-st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state))
+except Exception as e:
+    st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
+    st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido.")
 
 st.success("✅ Aplicación lista")
