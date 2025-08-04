@@ -27,7 +27,12 @@ def gps_day_from_date(date):
     """
     Calcula la semana y el día GPS a partir de una fecha.
     """
-    gps_start = datetime(1980, 1, 6)
+    # Convertir a datetime si la entrada es solo de tipo date
+    if isinstance(date, datetime):
+        gps_start = datetime(1980, 1, 6)
+    else:
+        gps_start = datetime(1980, 1, 6).date()
+    
     delta = date - gps_start
     gps_week = delta.days // 7
     gps_day = delta.days % 7
@@ -38,12 +43,18 @@ def build_igs_url(date):
     Construye la URL para descargar el archivo de efemérides de IGS.
     """
     try:
-        gps_week, gps_day = gps_day_from_date(date)
-        year = date.strftime('%Y')
-        doy = date.strftime('%j')
+        # Convertir `date` a `datetime` si es necesario
+        if isinstance(date, datetime):
+            selected_datetime = date
+        else:
+            selected_datetime = datetime.combine(date, datetime.min.time())
+
+        gps_week, gps_day = gps_day_from_date(selected_datetime)
+        year = selected_datetime.strftime('%Y')
+        doy = selected_datetime.strftime('%j')
         base_url = f"https://igs.bkg.bund.de/root_ftp/IGS/BRDC/{year}/{doy}/"
         # Ajuste del nombre del archivo para coincidir con el formato real
-        file_name = f"brdc{doy}0.{str(date.year)[2:]}n.gz"
+        file_name = f"brdc{doy}0.{str(selected_datetime.year)[2:]}n.gz"
         return base_url + file_name, file_name
     except Exception as e:
         st.error(f"Error al construir la URL: {e}")
