@@ -22,101 +22,82 @@ st.set_page_config(
 st.title("📡 Herramienta GNSS - Consulta y Descarga de Efemérides IGS")
 st.markdown("---")
 
-# Función para calcular el día GPS
-def gps_day_from_date(date):
+# Función para calcular el número de semana GPS y el día del año
+def calculate_gps_week_number(date):
     """
-    Calcula la semana y el día GPS a partir de una fecha.
+    Calcula el número de semana y día GPS a partir de una fecha.
     """
-    gps_start = datetime(1980, 1, 6)
-    delta = date - gps_start
-    gps_week = delta.days // 7
-    gps_day = delta.days % 7
-    return gps_week, gps_day
+    date_format = "%Y-%m-%d"
+    target_date = datetime.strptime(str(date), date_format)
+    gps_start_date = datetime(1980, 1, 6)
+    days_since_start = (target_date - gps_start_date).days
+    gps_week = days_since_start // 7
+    gps_day_of_week = days_since_start % 7
+    gps_week_number = gps_week * 10 + gps_day_of_week
+    day_of_year = target_date.timetuple().tm_yday
+    year = target_date.year
+    return gps_week, gps_week_number, day_of_year, year
 
-def build_brdc_url(date):
+def check_url(url):
     """
-    Construye la URL para descargar el archivo de efemérides BRDC de IGS.
+    Verifica si una URL es accesible.
     """
     try:
-        # Convertir `date` a `datetime` si es necesario
-        if isinstance(date, datetime.date):
-            date = datetime.combine(date, datetime.min.time())
-            
-        year = date.strftime('%Y')
-        doy = date.strftime('%j')
-        base_url = f"https://igs.bkg.bund.de/root_ftp/IGS/BRDC/{year}/{doy}/"
-        file_name = f"brdc{doy}0.{str(date.year)[2:]}n.gz"
-        return base_url + file_name, file_name
+        response = requests.head(url, timeout=5)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+def download_file(url, local_path):
+    """
+    Descarga un archivo desde una URL.
+    """
+    try:
+        response = requests.get(url, stream=True, timeout=10)
+        with open(local_path, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        return True
     except Exception as e:
-        st.error(f"Error al construir la URL de BRDC: {e}")
-        return None, None
+        st.error(f"Error al descargar {url}: {e}")
+        return False
 
-def build_precise_rapid_urls(date):
+def download_efemerides(date, folder_path):
     """
-    Construye las URLs para descargar efemérides precisas y rápidas.
+    Descarga efemérides precisas y rápidas.
     """
-    try:
-        # Convertir `date` a `datetime` si es necesario
-        if isinstance(date, datetime.date):
-            date = datetime.combine(date, datetime.min.time())
-
-        gps_week, gps_day = gps_day_from_date(date)
-        day_of_year = date.timetuple().tm_yday
-        year = date.year
-        
-        precise_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/JAX0MGXFIN_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
-        rapid_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week}{gps_day}.sp3.Z"
-        
-        return {
-            "Precise": (precise_url, os.path.basename(precise_url)),
-            "Rapid": (rapid_url, os.path.basename(rapid_url))
-        }
-    except Exception as e:
-        st.error(f"Error al construir URLs de Precise/Rapid: {e}")
-        return None
-
-def download_and_extract_file(url, filename, is_compressed=True):
-    """
-    Descarga y extrae un archivo de una URL.
-    """
-    if url is None or filename is None:
-        return None, None
+    gps_week, gps_week_number, day_of_year, year = calculate_gps_week_number(date)
     
-    tmpdir = tempfile.mkdtemp()
-    filepath = os.path.join(tmpdir, filename)
+    # URLs de descarga basadas en tu código original de Python
+    precise_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/JAX0MGXFIN_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
+    rapid_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
     
-    try:
-        r = requests.get(url, timeout=10)
-        if r.status_code != 200:
-            st.warning(f"No se pudo encontrar el archivo en la URL: {url}. Código de estado: {r.status_code}")
-            return None, None
+    files_to_download = [
+        (precise_url, 'Precisas', 'gz'),
+        (rapid_url, 'Rápidas', 'Z')
+    ]
+    
+    download_info = []
+
+    for url, label, compression_type in files_to_download:
+        local_filename = os.path.basename(url)
+        local_path = os.path.join(folder_path, local_filename)
         
-        with open(filepath, 'wb') as f:
-            f.write(r.content)
-            
-        if is_compressed:
-            extracted = filepath[:-len(os.path.splitext(filename)[1])]
-            if filename.endswith('.gz'):
-                with gzip.open(filepath, 'rb') as f_in, open(extracted, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            elif filename.endswith('.Z'):
-                # .Z es un formato de compresión diferente, que puede no ser soportado nativamente
-                # Aquí se simulará la descompresión para mantener la estructura
-                extracted = filepath
-                shutil.copyfile(filepath, extracted)
-                st.warning("El formato .Z no se descomprime automáticamente. Descargue y use una herramienta externa.")
+        status = "No disponible"
+        if check_url(url):
+            if download_file(url, local_path):
+                status = "Descargado"
             else:
-                extracted = filepath
-                
-            return extracted, os.path.basename(extracted)
-        else:
-            return filepath, filename
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error de conexión al intentar descargar el archivo: {e}")
-        return None, None
-    except Exception as e:
-        st.error(f"Error al procesar el archivo: {e}")
-        return None, None
+                status = "Error al descargar"
+        
+        download_info.append({
+            "label": label,
+            "filename": local_filename,
+            "status": status,
+            "local_path": local_path
+        })
+    
+    return download_info
 
 # ---- SIDEBAR INPUTS ----
 st.sidebar.header("📥 Ingresar parámetros")
@@ -124,53 +105,36 @@ st.sidebar.header("📥 Ingresar parámetros")
 # Sección para descargar efemérides
 st.sidebar.markdown("### 🗓️ Descargar Efemérides")
 selected_date = st.sidebar.date_input("Seleccionar fecha", datetime.today())
-efemerides_type = st.sidebar.selectbox("Tipo de Efemérides", ["BRDC (IGS)", "Precise y Rapid (IGS)"])
 
-# Lógica para mostrar la URL y el botón de descarga según el tipo seleccionado
-if efemerides_type == "BRDC (IGS)":
-    url, filename = build_brdc_url(selected_date)
-    if url:
-        st.sidebar.markdown(f"**URL del archivo:** [Abrir enlace]({url})")
-    if st.sidebar.button("🔽 Descargar archivo BRDC"):
-        if url:
-            with st.spinner("Descargando y descomprimiendo..."):
-                extracted_path, extracted_name = download_and_extract_file(url, filename)
-                if extracted_path:
-                    with open(extracted_path, "rb") as file:
+# Lógica de descarga integrada en el botón
+if st.sidebar.button("🔽 Descargar Efemérides"):
+    with st.spinner("Descargando y procesando..."):
+        tmpdir = tempfile.mkdtemp()
+        download_status = download_efemerides(selected_date, tmpdir)
+        
+        st.subheader("Estado de la descarga:")
+        
+        # Muestra el resultado de la descarga en el cuerpo principal
+        for info in download_status:
+            if info["status"] == "Descargado":
+                st.success(f"✅ {info['label']} ({info['filename']}) descargado.")
+                # Proporciona un botón de descarga para el archivo descargado
+                try:
+                    with open(info['local_path'], "rb") as file:
                         st.download_button(
-                            label=f"📄 Descargar {extracted_name}", 
-                            data=file, 
-                            file_name=extracted_name,
+                            label=f"📄 Descargar {info['label']}",
+                            data=file,
+                            file_name=info['filename'],
                             mime="application/octet-stream"
                         )
-                    st.success("✅ Descarga y descompresión completada.")
-                    shutil.rmtree(os.path.dirname(extracted_path))
-                else:
-                    st.error("No se pudo descargar o procesar el archivo. Revisa la fecha o intenta más tarde.")
-        else:
-            st.error("No se pudo construir la URL de descarga.")
-            
-elif efemerides_type == "Precise y Rapid (IGS)":
-    urls_dict = build_precise_rapid_urls(selected_date)
-    if urls_dict:
-        st.sidebar.markdown(f"**URL de efemérides precisas:** [Abrir enlace]({urls_dict['Precise'][0]})")
-        st.sidebar.markdown(f"**URL de efemérides rápidas:** [Abrir enlace]({urls_dict['Rapid'][0]})")
-        if st.sidebar.button("🔽 Descargar archivos Precise y Rapid"):
-            with st.spinner("Descargando y procesando..."):
-                for name, (url, filename) in urls_dict.items():
-                    extracted_path, extracted_name = download_and_extract_file(url, filename)
-                    if extracted_path:
-                        with open(extracted_path, "rb") as file:
-                            st.download_button(
-                                label=f"📄 Descargar {name} ({extracted_name})", 
-                                data=file, 
-                                file_name=extracted_name,
-                                mime="application/octet-stream"
-                            )
-                        st.success(f"✅ Descarga de {name} completada.")
-                        shutil.rmtree(os.path.dirname(extracted_path))
-                    else:
-                        st.error(f"No se pudo descargar {name}. Revisa la fecha o intenta más tarde.")
+                except Exception as e:
+                    st.error(f"Error al preparar el botón de descarga para {info['label']}: {e}")
+            else:
+                st.warning(f"⚠️ {info['label']} ({info['filename']}): {info['status']}")
+                
+        # Mensaje final
+        st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
+        shutil.rmtree(tmpdir)
 
 
 st.sidebar.markdown("---")
@@ -184,13 +148,13 @@ coord_format = st.sidebar.selectbox(
 
 user_coord = None
 if coord_format == "Decimal Geográficas":
-    lat = st.sidebar.number_input("Latitud", format="%.8f")
-    lon = st.sidebar.number_input("Longitud", format="%.8f")
+    lat = st.sidebar.number_input("Latitud", format="%.8f", key="lat_input")
+    lon = st.sidebar.number_input("Longitud", format="%.8f", key="lon_input")
     if lat != 0.0 or lon != 0.0:
         user_coord = (lat, lon)
 else:
-    este = st.sidebar.number_input("Este (X)", format="%.2f")
-    norte = st.sidebar.number_input("Norte (Y)", format="%.2f")
+    este = st.sidebar.number_input("Este (X)", format="%.2f", key="este_input")
+    norte = st.sidebar.number_input("Norte (Y)", format="%.2f", key="norte_input")
     if este != 0.0 or norte != 0.0:
         try:
             proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
