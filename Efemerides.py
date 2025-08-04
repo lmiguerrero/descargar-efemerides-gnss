@@ -220,6 +220,7 @@ if st.button("🗺️ Generar Mapa"):
                 "lat": df_sorted["Latitud"], # Usar la columna Latitud del CSV
                 "lon": df_sorted["Longitud"], # Usar la columna Longitud del CSV
                 "name": df_sorted["Nombre Municipio"],
+                "id": df_sorted["Id"],
                 "distance": df_sorted["Distancia_km"]
             })
             
@@ -239,7 +240,10 @@ if st.button("🗺️ Generar Mapa"):
                 get_radius=3000,
                 get_fill_color=[255, 140, 0, 200],  # Color para las estaciones
                 pickable=True,
-                tooltip={"text": "{name}\nDistancia: {distance:.2f} km"}
+                tooltip={
+                    "html": "<b>ID:</b> {id}<br/><b>Municipio:</b> {name}<br/><b>Distancia:</b> {distance:.2f} km",
+                    "style": {"color": "white"}
+                }
             )
             
             # Crea la capa de puntos para la ubicación del usuario
@@ -278,3 +282,4 @@ if st.button("🗺️ Generar Mapa"):
 
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
+
