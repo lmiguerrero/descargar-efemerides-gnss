@@ -8,7 +8,6 @@ import os
 import gzip
 import shutil
 import tempfile
-import pyproj
 import pydeck as pdk
 
 # Configuración de la página
@@ -157,6 +156,8 @@ else:
     norte = st.sidebar.number_input("Norte (Y)", format="%.2f", key="norte_input")
     if este != 0.0 or norte != 0.0:
         try:
+            # Aquí se asume que si se ingresan coordenadas planas, se necesita pyproj para transformarlas
+            # y que el usuario espera ver el punto convertido en el mapa.
             proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
             lon_decimal, lat_decimal = proj.transform(este, norte)
             user_coord = (lat_decimal, lon_decimal)
@@ -178,18 +179,9 @@ if st.button("🗺️ Generar Mapa"):
         
         if user_coord is not None:
             # Lógica de cálculo de distancia y ordenamiento
-            transformer_3116_to_4326 = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
-            
-            # Convertir coordenadas del CSV a Lat/Lon
-            df['LonLat'] = df.apply(
-                lambda row: transformer_3116_to_4326.transform(row['Este'], row['Norte']), axis=1
-            )
-            df['lon'] = df['LonLat'].apply(lambda x: x[0])
-            df['lat'] = df['LonLat'].apply(lambda x: x[1])
-
-            # Calcular la distancia
+            # Se usan las columnas 'Latitud' y 'Longitud' del CSV
             df["Distancia_km"] = df.apply(
-                lambda row: geodesic(user_coord, (row['lat'], row['lon'])).kilometers, axis=1
+                lambda row: geodesic(user_coord, (row['Latitud'], row['Longitud'])).kilometers, axis=1
             )
             df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
             
@@ -225,8 +217,8 @@ if st.button("🗺️ Generar Mapa"):
             
             # Mapea las columnas para pydeck
             station_map_data = pd.DataFrame({
-                "lat": df_sorted["lat"],
-                "lon": df_sorted["lon"],
+                "lat": df_sorted["Latitud"], # Usar la columna Latitud del CSV
+                "lon": df_sorted["Longitud"], # Usar la columna Longitud del CSV
                 "name": df_sorted["Nombre Municipio"],
                 "distance": df_sorted["Distancia_km"]
             })
@@ -282,6 +274,7 @@ if st.button("🗺️ Generar Mapa"):
 
     except Exception as e:
         st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
-        st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido.")
+        st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido, y de que el archivo contiene las columnas 'Latitud' y 'Longitud'.")
 
 st.success("✅ Aplicación lista")
+
