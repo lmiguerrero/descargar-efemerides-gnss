@@ -35,7 +35,7 @@ def calculate_gps_week_number(date):
     days_since_start = (target_date - gps_start_date).days
     gps_week = days_since_start // 7
     gps_day_of_week = days_since_start % 7
-    gps_week_number = gps_week * 10 + gps_day_of_week  # Formato GPS week-day
+    gps_week_number = gps_since_start // 7 * 10 + days_since_start % 7 # Formato GPS week-day
     day_of_year = target_date.timetuple().tm_yday
     year = target_date.year
     return gps_week, gps_week_number, day_of_year, year
@@ -116,7 +116,7 @@ st.sidebar.markdown("### 🗓️ Descargar Efemérides")
 selected_date = st.sidebar.date_input("Seleccionar fecha", datetime.today())
 download_precise = st.sidebar.checkbox("Descargar Efemérides Precisas JAX", value=True)
 download_rapid = st.sidebar.checkbox("Descargar Efemérides Rápidas", value=False)
-download_gfz = st.sidebar.checkbox("Descargar Efemérides GFZ", value=False)  # Nueva opción para GFZ
+download_gfz = st.sidebar.checkbox("Descargar Efemérides Precisas GFZ", value=False)  # Nueva opción para GFZ
 
 # Lógica de descarga que se activa con el botón
 if st.sidebar.button("🔽 Descargar Efemérides"):
@@ -195,18 +195,18 @@ else:
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
 # Opciones de fondo de mapa para pydeck
-map_styles = {
-    "OpenStreetMap": "OpenStreetMap",
-    "CartoDB Claro (Positron)": "carto-positron",  # Corregido a un estilo compatible con pydeck
-    "CartoDB Oscuro": "carto-darkmatter", # Corregido a un estilo compatible con pydeck
-    "Satélite (Esri)": "satellite", # Estilo genérico compatible con pydeck
-    "Esri NatGeo World Map": "Esri_NatGeoWorldMap", # Estilo genérico compatible con pydeck
-    "Esri World Topo Map": "Esri_WorldTopoMap" # Estilo genérico compatible con pydeck
+MAP_STYLES = {
+    "OpenStreetMap": "light",
+    "CartoDB Claro (Positron)": "carto-positron",
+    "CartoDB Oscuro": "carto-darkmatter",
+    "Satélite (Esri)": "satellite",
+    "Esri NatGeo World Map": "Esri_NatGeoWorldMap",
+    "Esri World Topo Map": "Esri_WorldTopoMap"
 }
 
 # Selector de fondo de mapa en la barra lateral
-selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(map_styles.keys()), index=0)
-selected_map_style_url = map_styles[selected_map_style_name]
+selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()), index=0)
+selected_map_style = MAP_STYLES[selected_map_style_name]
 
 
 # ---- CONTENIDO PRINCIPAL ----
@@ -237,7 +237,7 @@ if st.button("🗺️ Generar Mapa"):
 
             for index, row in df_sorted.iterrows():
                 # Construye la URL con el alias de la estación para el mapa
-                base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
+                base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.6017871105921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
                 alias_link = f"[{row['Id']}]({base_url}{row['Id']})"
 
                 # Formatea los valores de las coordenadas y la distancia
@@ -324,7 +324,7 @@ if st.button("🗺️ Generar Mapa"):
             st.pydeck_chart(pdk.Deck(
                 layers=[station_layer, text_layer, user_layer], 
                 initial_view_state=view_state,
-                map_style=selected_map_style_url  # Usa el estilo seleccionado por el usuario
+                map_style=selected_map_style # Usa el estilo seleccionado por el usuario
             ))
 
         else:
@@ -338,10 +338,6 @@ st.markdown("---")
 # Sección de sugerencias con enlace 'mailto'
 st.markdown("### 💬 Dejar una sugerencia")
 st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
-
-# Crea un hipervínculo con el protocolo 'mailto'
-mailto_link = "mailto:osirias@gmail.com?subject=Sugerencia para la Herramienta GNSS"
-st.markdown(f"**[Abrir correo y enviar sugerencia]({mailto_link})**")
 
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
