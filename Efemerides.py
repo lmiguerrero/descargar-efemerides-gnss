@@ -193,18 +193,29 @@ if st.button("🗺️ Generar Mapa"):
             # Crear la tabla con los datos
             st.markdown("### 📌 Estaciones más cercanas:")
             
-            # Crear un DataFrame para la tabla con los datos que se van a mostrar
-            table_df = df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Norte', 'Este', 'Distancia_km']].copy()
-            
-            # Formatear la columna de distancia para mostrar solo 2 decimales
-            table_df['Distancia_km'] = table_df['Distancia_km'].apply(lambda x: f"{x:.2f} km")
+            # Formatear las columnas para la visualización
+            table_data = []
+            headers = ['Id', 'Nombre Municipio', 'Nombre Departamento', 'Norte', 'Este', 'Distancia']
+            table_data.append(headers)
 
-            # Convertir la columna ID a hipervínculos
-            base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
-            table_df['Id'] = table_df['Id'].apply(lambda alias: f"[{alias}]({base_url}{alias})")
+            for index, row in df_sorted.iterrows():
+                # Construir la URL con el alias de la estación
+                base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
+                alias_link = f"[{row['Id']}]({base_url}{row['Id']})"
 
-            # Mostrar la tabla en Streamlit
-            st.markdown(table_df.to_markdown(index=False), unsafe_allow_html=True)
+                # Formatear los valores
+                norte = f"{row['Norte']:.3f}"
+                este = f"{row['Este']:.3f}"
+                distancia = f"{row['Distancia_km']:.2f} km"
+                
+                table_data.append([alias_link, row['Nombre Municipio'], row['Nombre Departamento'], norte, este, distancia])
+
+            # Mostrar la tabla usando markdown con un formato simple
+            markdown_table = "| " + " | ".join(headers) + " |\n"
+            markdown_table += "|---" * len(headers) + "|\n"
+            for row in table_data[1:]:
+                markdown_table += "| " + " | ".join(row) + " |\n"
+            st.markdown(markdown_table, unsafe_allow_html=True)
 
             # Código del mapa
             st.markdown("### 🗺️ Ver mapa de estaciones")
