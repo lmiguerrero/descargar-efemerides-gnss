@@ -35,7 +35,7 @@ def calculate_gps_week_number(date):
     days_since_start = (target_date - gps_start_date).days
     gps_week = days_since_start // 7
     gps_day_of_week = days_since_start % 7
-    gps_week_number = gps_since_start // 7 * 10 + days_since_start % 7 # Formato GPS week-day
+    gps_week_number = gps_week * 10 + gps_day_of_week  # Formato GPS week-day
     day_of_year = target_date.timetuple().tm_yday
     year = target_date.year
     return gps_week, gps_week_number, day_of_year, year
@@ -195,18 +195,18 @@ else:
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
 # Opciones de fondo de mapa para pydeck
+# Usamos un diccionario para mapear nombres amigables a URLs de servidores de azulejos
 MAP_STYLES = {
-    "OpenStreetMap": "light",
-    "CartoDB Claro (Positron)": "carto-positron",
-    "CartoDB Oscuro": "carto-darkmatter",
-    "Satélite (Esri)": "satellite",
-    "Esri NatGeo World Map": "Esri_NatGeoWorldMap",
-    "Esri World Topo Map": "Esri_WorldTopoMap"
+    "Fondo Claro (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}.png",
+    "Fondo Oscuro (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png",
+    "Satélite (Esri)": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "Mapas de Carreteras (OpenStreetMap)": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "Relieve (Stamen)": "https://stamen-tiles.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png"
 }
 
 # Selector de fondo de mapa en la barra lateral
 selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()), index=0)
-selected_map_style = MAP_STYLES[selected_map_style_name]
+selected_map_style_url = MAP_STYLES[selected_map_style_name]
 
 
 # ---- CONTENIDO PRINCIPAL ----
@@ -275,6 +275,18 @@ if st.button("🗺️ Generar Mapa"):
                 "distance": [0.0]
             })
 
+            # Creamos la capa base del mapa si no es uno de los estilos nativos
+            base_map_layer = None
+            if selected_map_style_url not in ["light", "dark", "satellite", "road"]:
+                base_map_layer = pdk.Layer(
+                    "TileLayer",
+                    data=selected_map_style_url,
+                    tooltip={
+                        "html": "{x}, {y}, {z}",
+                        "style": {"color": "white"}
+                    }
+                )
+
             # Crea la capa de puntos para las estaciones
             station_layer = pdk.Layer(
                 "ScatterplotLayer",
@@ -319,12 +331,15 @@ if st.button("🗺️ Generar Mapa"):
                 zoom=6,
                 pitch=0  # Vista plana
             )
-            
+
+            # Combina todas las capas, poniendo el mapa base al principio
+            layers = [layer for layer in [base_map_layer, station_layer, text_layer, user_layer] if layer is not None]
+
             # Muestra el mapa en la aplicación
             st.pydeck_chart(pdk.Deck(
-                layers=[station_layer, text_layer, user_layer], 
+                layers=layers, 
                 initial_view_state=view_state,
-                map_style=selected_map_style # Usa el estilo seleccionado por el usuario
+                map_style=None if base_map_layer else "light"
             ))
 
         else:
@@ -338,6 +353,5 @@ st.markdown("---")
 # Sección de sugerencias con enlace 'mailto'
 st.markdown("### 💬 Dejar una sugerencia")
 st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
-
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
