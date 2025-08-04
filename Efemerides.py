@@ -178,15 +178,18 @@ if st.button("🗺️ Generar Mapa"):
         
         if user_coord is not None:
             # Lógica de cálculo de distancia y ordenamiento
-            transformer_4326_to_3116 = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3116", always_xy=True)
+            transformer_3116_to_4326 = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
             
-            # Convertir coordenadas del CSV a Lat/Lon para el cálculo de distancia geodesic
-            df['LatLon'] = df.apply(
-                lambda row: transformer_4326_to_3116.transform(row['Este'], row['Norte'], direction='INVERSE'), axis=1
+            # Convertir coordenadas del CSV a Lat/Lon
+            df['LonLat'] = df.apply(
+                lambda row: transformer_3116_to_4326.transform(row['Este'], row['Norte']), axis=1
             )
-            
-            df["Distancia_km"] = df["LatLon"].apply(
-                lambda x: geodesic(user_coord, (x[1], x[0])).kilometers
+            df['lon'] = df['LonLat'].apply(lambda x: x[0])
+            df['lat'] = df['LonLat'].apply(lambda x: x[1])
+
+            # Calcular la distancia
+            df["Distancia_km"] = df.apply(
+                lambda row: geodesic(user_coord, (row['lat'], row['lon'])).kilometers, axis=1
             )
             df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
             
@@ -221,9 +224,9 @@ if st.button("🗺️ Generar Mapa"):
             st.markdown("### 🗺️ Ver mapa de estaciones")
             
             # Mapea las columnas para pydeck
-            map_data = pd.DataFrame({
-                "lat": df_sorted["LatLon"].apply(lambda x: x[1]),
-                "lon": df_sorted["LatLon"].apply(lambda x: x[0]),
+            station_map_data = pd.DataFrame({
+                "lat": df_sorted["lat"],
+                "lon": df_sorted["lon"],
                 "name": df_sorted["Nombre Municipio"],
                 "distance": df_sorted["Distancia_km"]
             })
@@ -239,7 +242,7 @@ if st.button("🗺️ Generar Mapa"):
             # Crea la capa de puntos para las estaciones
             station_layer = pdk.Layer(
                 "ScatterplotLayer",
-                data=map_data,
+                data=station_map_data,
                 get_position=["lon", "lat"],
                 get_radius=3000,
                 get_fill_color=[255, 140, 0, 200],  # Color para las estaciones
@@ -270,7 +273,7 @@ if st.button("🗺️ Generar Mapa"):
             st.pydeck_chart(pdk.Deck(
                 layers=[station_layer, user_layer], 
                 initial_view_state=view_state,
-                map_style="mapbox://styles/mapbox/satellite-v9", # Fondo satelital
+                map_style="light", # Fondo de OpenStreetMap
                 tooltip={"html": "<b>{name}</b><br/>Distancia: {distance:.2f} km", "style": {"color": "white"}}
             ))
 
