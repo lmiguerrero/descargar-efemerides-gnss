@@ -10,23 +10,24 @@ import shutil
 import tempfile
 import pydeck as pdk
 import pyproj
-import urllib.parse # Importamos para codificar el texto para la URL
+import urllib.parse  # Importamos para codificar el texto para la URL
 
-# Configuració de la pàgina
+# Configuración de la página de Streamlit
 st.set_page_config(
     page_title="Herramienta GNSS",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Títol principal de l'aplicació
+# Título principal de la aplicación
 st.title("📡 Herramienta GNSS - Consulta y Descarga de Efemérides IGS")
 st.markdown("---")
 
-# Funció per calcular el número de setmana GPS i el dia de l'any
+# Función para calcular la semana GPS y el día del año a partir de una fecha
 def calculate_gps_week_number(date):
     """
-    Calcula el número de setmana i dia GPS a partir d'una data.
+    Calcula el número de la semana GPS, el día de la semana GPS,
+    el día del año y el año a partir de una fecha determinada.
     """
     date_format = "%Y-%m-%d"
     target_date = datetime.strptime(str(date), date_format)
@@ -34,14 +35,15 @@ def calculate_gps_week_number(date):
     days_since_start = (target_date - gps_start_date).days
     gps_week = days_since_start // 7
     gps_day_of_week = days_since_start % 7
-    gps_week_number = gps_week * 10 + gps_day_of_week
+    gps_week_number = gps_week * 10 + gps_day_of_week  # Formato GPS week-day
     day_of_year = target_date.timetuple().tm_yday
     year = target_date.year
     return gps_week, gps_week_number, day_of_year, year
 
 def check_url(url):
     """
-    Verifica si una URL és accessible.
+    Verifica si una URL está accesible enviando una petición HEAD.
+    Retorna True si el código de estado es 200 (OK), de lo contrario, False.
     """
     try:
         response = requests.head(url, timeout=5)
@@ -51,7 +53,8 @@ def check_url(url):
 
 def download_file(url, local_path):
     """
-    Descàrrega un fitxer des d'una URL.
+    Descarga un archivo desde una URL a una ruta local especificada.
+    Muestra un mensaje de error si la descarga falla.
     """
     try:
         response = requests.get(url, stream=True, timeout=10)
@@ -65,7 +68,8 @@ def download_file(url, local_path):
 
 def download_efemerides(date, folder_path, download_precise, download_rapid, download_gfz):
     """
-    Descàrrega efemèrides precises, ràpides i GFZ segons la selecció.
+    Gestiona la descarga de efemérides según las opciones seleccionadas por el usuario.
+    Construye las URLs de descarga para los diferentes tipos de efemérides (JAX, Rápidas, GFZ).
     """
     gps_week, gps_week_number, day_of_year, year = calculate_gps_week_number(date)
     
@@ -104,17 +108,17 @@ def download_efemerides(date, folder_path, download_precise, download_rapid, dow
     
     return download_info
 
-# ---- SIDEBAR INPUTS ----
+# ---- INPUTS EN LA BARRA LATERAL (SIDEBAR) ----
 st.sidebar.header("📥 Ingresar parámetros")
 
-# Secció per descarregar efemèrides amb checkboxes
+# Sección para descargar efemérides con casillas de verificación
 st.sidebar.markdown("### 🗓️ Descargar Efemérides")
 selected_date = st.sidebar.date_input("Seleccionar fecha", datetime.today())
 download_precise = st.sidebar.checkbox("Descargar Efemérides Precisas JAX", value=True)
 download_rapid = st.sidebar.checkbox("Descargar Efemérides Rápidas", value=False)
-download_gfz = st.sidebar.checkbox("Descargar Efemérides GFZ", value=False) # Nueva opción para GFZ
+download_gfz = st.sidebar.checkbox("Descargar Efemérides Precisas GFZ", value=False)  # Nueva opción para GFZ
 
-# Lògica de descàrrega integrada en el botó
+# Lógica de descarga que se activa con el botón
 if st.sidebar.button("🔽 Descargar Efemérides"):
     if not download_precise and not download_rapid and not download_gfz:
         st.sidebar.warning("Por favor, selecciona al menos un tipo de efemérides para descargar.")
@@ -125,11 +129,11 @@ if st.sidebar.button("🔽 Descargar Efemérides"):
             
             st.subheader("Estado de la descarga:")
             
-            # Mostra el resultat de la descàrrega en el cos principal
+            # Muestra el resultado de la descarga en el cuerpo principal de la aplicación
             for info in download_status:
                 if info["status"] == "Descargado":
                     st.success(f"✅ {info['label']} ({info['filename']}) descargado.")
-                    # Proporciona un botó de descàrrega per al fitxer descarregat
+                    # Proporciona un botón de descarga para el archivo descargado
                     try:
                         with open(info['local_path'], "rb") as file:
                             st.download_button(
@@ -143,24 +147,37 @@ if st.sidebar.button("🔽 Descargar Efemérides"):
                 else:
                     st.warning(f"⚠️ {info['label']} ({info['filename']}): {info['status']}")
             
-            # Missatge final
+            # Mensaje final después de la descarga
             st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
             shutil.rmtree(tmpdir)
 
 
 st.sidebar.markdown("---")
 
-# Secció per cercar estacions
+# Sección para buscar estaciones GNSS cercanas
 st.sidebar.markdown("### 📍 Coordenadas para búsqueda de estaciones")
 coord_format = st.sidebar.selectbox(
     "Formato de coordenadas",
-    ["Decimal Geográficas", "Origen Nacional"] # Nombre cambiado
+    ["Grados, Minutos, Segundos", "Origen Nacional"]
 )
 
 user_coord = None
-if coord_format == "Decimal Geográficas":
-    lat = st.sidebar.number_input("Latitud", format="%.8f", key="lat_input")
-    lon = st.sidebar.number_input("Longitud", format="%.8f", key="lon_input")
+if coord_format == "Grados, Minutos, Segundos":
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Latitud")
+    lat_deg = st.sidebar.number_input("Grados", min_value=-90, max_value=90, value=0, key="lat_deg_input")
+    lat_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=0, key="lat_min_input")
+    lat_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=0.0, format="%.6f", key="lat_sec_input")
+    
+    st.sidebar.subheader("Longitud")
+    lon_deg = st.sidebar.number_input("Grados", min_value=-180, max_value=180, value=0, key="lon_deg_input")
+    lon_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=0, key="lon_min_input")
+    lon_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=0.0, format="%.6f", key="lon_sec_input")
+    
+    # Conversión de grados, minutos y segundos a grados decimales
+    lat = lat_deg + lat_min / 60 + lat_sec / 3600
+    lon = lon_deg + lon_min / 60 + lon_sec / 3600
+
     if lat != 0.0 or lon != 0.0:
         user_coord = (lat, lon)
 else:
@@ -168,6 +185,7 @@ else:
     norte = st.sidebar.number_input("Norte (Y)", format="%.2f", key="norte_input")
     if este != 0.0 or norte != 0.0:
         try:
+            # Transformación de coordenadas de Origen Nacional (EPSG:3116) a WGS84 (EPSG:4326)
             proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
             lon_decimal, lat_decimal = proj.transform(este, norte)
             user_coord = (lat_decimal, lon_decimal)
@@ -176,66 +194,65 @@ else:
 
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
-# ---- CONTINGUT PRINCIPAL ----
+# ---- CONTENIDO PRINCIPAL ----
 st.subheader("🗺️ Estaciones GNSS más cercanas")
 st.markdown("Las estaciones cercanas se calculan con base en un conjunto de coordenadas de referencia.")
 
-# Botó per generar el mapa
+# Botón para generar el mapa y la tabla
 if st.button("🗺️ Generar Mapa"):
-    # Càrrega de dades de les estacions
+    # Carga de datos de las estaciones desde un archivo CSV
     csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
     try:
         df = pd.read_csv(csv_url)
         
         if user_coord is not None:
-            # Lògica de càlcul de distància i ordenament
-            # S'utilitzen les columnes 'Latitud' i 'Longitud' del CSV
+            # Lógica para calcular la distancia y ordenar las estaciones
             df["Distancia_km"] = df.apply(
                 lambda row: geodesic(user_coord, (row['Latitud'], row['Longitud'])).kilometers, axis=1
             )
             df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
             
-            # Crea la taula amb les dades
+            # Crea la tabla con las estaciones más cercanas
             st.markdown("### 📌 Estaciones más cercanas:")
             
-            # Formata les columnes per a la visualització
+            # Formatea las columnas para la visualización en la tabla
             table_data = []
             headers = ['Id', 'Nombre Municipio', 'Nombre Departamento', 'Norte', 'Este', 'Distancia']
             table_data.append(headers)
 
             for index, row in df_sorted.iterrows():
-                # Construeix la URL amb l'àlies de l'estació
+                # Construye la URL con el alias de la estación para el mapa
                 base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
                 alias_link = f"[{row['Id']}]({base_url}{row['Id']})"
 
-                # Formata els valors
+                # Formatea los valores de las coordenadas y la distancia
                 norte = f"{row['Norte']:.3f}"
                 este = f"{row['Este']:.3f}"
                 distancia = f"{row['Distancia_km']:.2f} km"
                 
                 table_data.append([alias_link, row['Nombre Municipio'], row['Nombre Departamento'], norte, este, distancia])
 
-            # Mostra la taula usant markdown amb un format simple
+            # Muestra la tabla usando Markdown
             markdown_table = "| " + " | ".join(headers) + " |\n"
             markdown_table += "|---" * len(headers) + "|\n"
             for row in table_data[1:]:
                 markdown_table += "| " + " | ".join(row) + " |\n"
             st.markdown(markdown_table, unsafe_allow_html=True)
 
-            # Codi del mapa
+            # Código para generar el mapa interactivo
             st.markdown("### 🗺️ Ver mapa de estaciones")
             
-            # Mapea las columnas para pydeck
+            # Mapea las columnas para el formato de pydeck
             station_map_data = pd.DataFrame({
-                "lat": df_sorted["Latitud"], # Usa la columna Latitud del CSV
-                "lon": df_sorted["Longitud"], # Usa la columna Longitud del CSV
+                "lat": df_sorted["Latitud"],
+                "lon": df_sorted["Longitud"],
                 "name": df_sorted["Nombre Municipio"],
                 "id": df_sorted["Id"],
                 "department": df_sorted["Nombre Departamento"],
                 "distance": df_sorted["Distancia_km"]
             })
             
-            # Agrega la coordenada del usuario al mapa para que aparezca como un punto diferente
+            # Agrega la coordenada del usuario al mapa como un punto de color diferente
             user_point_df = pd.DataFrame({
                 "lat": [user_coord[0]],
                 "lon": [user_coord[1]],
@@ -243,13 +260,13 @@ if st.button("🗺️ Generar Mapa"):
                 "distance": [0.0]
             })
 
-            # Crea la capa de puntos para las estacions
+            # Crea la capa de puntos para las estaciones
             station_layer = pdk.Layer(
                 "ScatterplotLayer",
                 data=station_map_data,
                 get_position=["lon", "lat"],
                 get_radius=3000,
-                get_fill_color=[255, 140, 0, 200],  # Color per a les estacions
+                get_fill_color=[255, 140, 0, 200],  # Color naranja para las estaciones
                 pickable=True,
                 tooltip={
                     "html": "<b>ID:</b> {id}<br/><b>Municipio:</b> {name}<br/><b>Departamento:</b> {department}",
@@ -257,42 +274,42 @@ if st.button("🗺️ Generar Mapa"):
                 }
             )
 
-            # Crea la capa d'etiquetes de text per a les estacions
+            # Crea la capa de etiquetas de texto para los IDs de las estaciones
             text_layer = pdk.Layer(
                 "TextLayer",
                 data=station_map_data,
                 get_position=["lon", "lat"],
                 get_text="id",
-                get_color=[0, 0, 0, 255], # Color negre per al text
+                get_color=[0, 0, 0, 255], # Color negro para el texto
                 get_size=10,
                 get_alignment_baseline="'bottom'",
                 get_pixel_offset=[0, -10],
             )
             
-            # Crea la capa de puntos para la ubicació de l'usuari amb transparència
+            # Crea la capa de puntos para la ubicación del usuario con transparencia
             user_layer = pdk.Layer(
                 "ScatterplotLayer",
                 data=user_point_df,
                 get_position=["lon", "lat"],
-                get_radius=5000, # Una mica més gran perquè es noti
-                get_fill_color=[255, 0, 0, 150], # Vermell brillant per a la ubicació de l'usuari, amb transparència
+                get_radius=5000, # Un poco más grande para destacarlo
+                get_fill_color=[255, 0, 0, 150], # Color rojo con transparencia para la ubicación del usuario
                 pickable=True,
                 tooltip={"text": "{name}"}
             )
 
-            # Configura l'estat inicial de la vista del mapa
+            # Configura el estado inicial de la vista del mapa, centrado en el usuario
             view_state = pdk.ViewState(
                 latitude=user_coord[0],
                 longitude=user_coord[1],
                 zoom=6,
-                pitch=0 # Configurat perquè la vista sigui plana
+                pitch=0  # Vista plana
             )
             
-            # Mostra el mapa en l'aplicació
+            # Muestra el mapa en la aplicación
             st.pydeck_chart(pdk.Deck(
                 layers=[station_layer, text_layer, user_layer], 
                 initial_view_state=view_state,
-                map_style="light" # Fons d'OpenStreetMap
+                map_style="light"  # Estilo de mapa base
             ))
 
         else:
@@ -303,10 +320,13 @@ if st.button("🗺️ Generar Mapa"):
         st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido, y de que el archivo contiene las columnas 'Latitud' y 'Longitud'.")
 
 st.markdown("---")
-# Secció de suggeriments amb link mailto
+# Sección de sugerencias con enlace 'mailto'
 st.markdown("### 💬 Dejar una sugerencia")
 st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
 
+# Crea un hipervínculo con el protocolo 'mailto'
+mailto_link = "mailto:osirias@gmail.com?subject=Sugerencia para la Herramienta GNSS"
+st.markdown(f"**[Abrir correo y enviar sugerencia]({mailto_link})**")
 
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
