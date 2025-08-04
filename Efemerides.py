@@ -300,21 +300,11 @@ if st.button("🗺️ Generar Mapa"):
 st.markdown("---")
 # Secció de suggeriments amb link mailto
 st.markdown("### 💬 Dejar una sugerencia")
-suggestion_text = st.text_area("Si tienes alguna sugerencia o comentario, por favor, déjalo aquí.", height=150, key="suggestion_box")
+st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
 
-# Lógica para crear el hipervínculo de correo
-if st.button("Enviar sugerencia"):
-    if suggestion_text:
-        # Codificamos el texto para que sea seguro en una URL
-        encoded_text = urllib.parse.quote(suggestion_text)
-        
-        # Creamos el enlace 'mailto:' con el asunto y el cuerpo del mensaje
-        mailto_link = f"mailto:osirias@gmail.com?subject=Sugerencia para la Herramienta GNSS&body={encoded_text}"
-        
-        st.success("¡Sugerencia preparada! Haz clic en el siguiente enlace para abrir tu cliente de correo:")
-        st.markdown(f"**[Abrir correo y enviar sugerencia]({mailto_link})**")
-    else:
-        st.warning("Por favor, escribe algo en el cuadro de sugerencias antes de enviarlo.")
+# Creamos el enlace 'mailto:' con el asunto y la dirección de correo
+mailto_link = "mailto:osirias@gmail.com?subject=Sugerencia para la Herramienta GNSS"
+st.markdown(f"**[Abrir correo y enviar sugerencia]({mailto_link})**")
 
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
