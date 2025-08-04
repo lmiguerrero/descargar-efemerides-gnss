@@ -302,9 +302,5 @@ st.markdown("---")
 st.markdown("### 💬 Dejar una sugerencia")
 st.markdown("Haz clic en el siguiente enlace para enviarme un correo electrónico con tus sugerencias.")
 
-# Creamos el enlace 'mailto:' con el asunto y la dirección de correo
-mailto_link = "mailto:osirias@gmail.com?subject=Sugerencia para la Herramienta GNSS"
-st.markdown(f"**[Abrir correo y enviar sugerencia]({mailto_link})**")
-
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
