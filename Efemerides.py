@@ -221,6 +221,7 @@ if st.button("🗺️ Generar Mapa"):
                 "lon": df_sorted["Longitud"], # Usar la columna Longitud del CSV
                 "name": df_sorted["Nombre Municipio"],
                 "id": df_sorted["Id"],
+                "department": df_sorted["Nombre Departamento"],
                 "distance": df_sorted["Distancia_km"]
             })
             
@@ -241,7 +242,7 @@ if st.button("🗺️ Generar Mapa"):
                 get_fill_color=[255, 140, 0, 200],  # Color para las estaciones
                 pickable=True,
                 tooltip={
-                    "html": "<b>ID:</b> {id}<br/><b>Municipio:</b> {name}<br/><b>Distancia:</b> {distance:.2f} km",
+                    "html": "<b>Departamento:</b> {department}<br/><b>Municipio:</b> {name}<br/><b>Estación:</b> {id}<br/><b>Distancia:</b> {distance:.2f} km",
                     "style": {"color": "white"}
                 }
             )
@@ -282,4 +283,3 @@ if st.button("🗺️ Generar Mapa"):
 
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
-
