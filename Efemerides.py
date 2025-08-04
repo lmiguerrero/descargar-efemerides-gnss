@@ -9,6 +9,8 @@ import gzip
 import shutil
 import tempfile
 import pydeck as pdk
+import pyproj
+import urllib.parse # Importamos para codificar el texto para la URL
 
 # Configuració de la pàgina
 st.set_page_config(
@@ -61,20 +63,20 @@ def download_file(url, local_path):
         st.error(f"Error al descargar {url}: {e}")
         return False
 
-def download_efemerides(date, folder_path):
+def download_efemerides(date, folder_path, download_precise, download_rapid):
     """
-    Descàrrega efemèrides precises i ràpides.
+    Descàrrega efemèrides precises i ràpides segons la selecció.
     """
     gps_week, gps_week_number, day_of_year, year = calculate_gps_week_number(date)
     
-    # URLs de descàrrega basades en el teu codi original de Python
-    precise_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/JAX0MGXFIN_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
-    rapid_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
+    files_to_download = []
+    if download_precise:
+        precise_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/JAX0MGXFIN_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
+        files_to_download.append((precise_url, 'Precisas', 'gz'))
     
-    files_to_download = [
-        (precise_url, 'Precisas', 'gz'),
-        (rapid_url, 'Rápidas', 'Z')
-    ]
+    if download_rapid:
+        rapid_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
+        files_to_download.append((rapid_url, 'Rápidas', 'Z'))
     
     download_info = []
 
@@ -101,39 +103,44 @@ def download_efemerides(date, folder_path):
 # ---- SIDEBAR INPUTS ----
 st.sidebar.header("📥 Ingresar parámetros")
 
-# Secció per descarregar efemèrides
+# Secció per descarregar efemèrides amb checkboxes
 st.sidebar.markdown("### 🗓️ Descargar Efemérides")
 selected_date = st.sidebar.date_input("Seleccionar fecha", datetime.today())
+download_precise = st.sidebar.checkbox("Descargar Efemérides Precisas JAX", value=True)
+download_rapid = st.sidebar.checkbox("Descargar Efemérides Rápidas", value=False)
 
 # Lògica de descàrrega integrada en el botó
 if st.sidebar.button("🔽 Descargar Efemérides"):
-    with st.spinner("Descargando y procesando..."):
-        tmpdir = tempfile.mkdtemp()
-        download_status = download_efemerides(selected_date, tmpdir)
-        
-        st.subheader("Estado de la descarga:")
-        
-        # Mostra el resultat de la descàrrega en el cos principal
-        for info in download_status:
-            if info["status"] == "Descargado":
-                st.success(f"✅ {info['label']} ({info['filename']}) descargado.")
-                # Proporciona un botó de descàrrega per al fitxer descarregat
-                try:
-                    with open(info['local_path'], "rb") as file:
-                        st.download_button(
-                            label=f"📄 Descargar {info['label']}",
-                            data=file,
-                            file_name=info['filename'],
-                            mime="application/octet-stream"
-                        )
-                except Exception as e:
-                    st.error(f"Error al preparar el botón de descarga para {info['label']}: {e}")
-            else:
-                st.warning(f"⚠️ {info['label']} ({info['filename']}): {info['status']}")
-                
-        # Missatge final
-        st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
-        shutil.rmtree(tmpdir)
+    if not download_precise and not download_rapid:
+        st.sidebar.warning("Por favor, selecciona al menos un tipo de efemérides para descargar.")
+    else:
+        with st.spinner("Descargando y procesando..."):
+            tmpdir = tempfile.mkdtemp()
+            download_status = download_efemerides(selected_date, tmpdir, download_precise, download_rapid)
+            
+            st.subheader("Estado de la descarga:")
+            
+            # Mostra el resultat de la descàrrega en el cos principal
+            for info in download_status:
+                if info["status"] == "Descargado":
+                    st.success(f"✅ {info['label']} ({info['filename']}) descargado.")
+                    # Proporciona un botó de descàrrega per al fitxer descarregat
+                    try:
+                        with open(info['local_path'], "rb") as file:
+                            st.download_button(
+                                label=f"📄 Descargar {info['label']}",
+                                data=file,
+                                file_name=info['filename'],
+                                mime="application/octet-stream"
+                            )
+                    except Exception as e:
+                        st.error(f"Error al preparar el botón de descarga para {info['label']}: {e}")
+                else:
+                    st.warning(f"⚠️ {info['label']} ({info['filename']}): {info['status']}")
+            
+            # Missatge final
+            st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
+            shutil.rmtree(tmpdir)
 
 
 st.sidebar.markdown("---")
@@ -142,7 +149,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### 📍 Coordenadas para búsqueda de estaciones")
 coord_format = st.sidebar.selectbox(
     "Formato de coordenadas",
-    ["Decimal Geográficas", "Magna-SIRGAS (Este, Norte)"]
+    ["Decimal Geográficas", "Origen Nacional"] # Nombre cambiado
 )
 
 user_coord = None
@@ -156,8 +163,6 @@ else:
     norte = st.sidebar.number_input("Norte (Y)", format="%.2f", key="norte_input")
     if este != 0.0 or norte != 0.0:
         try:
-            # Aquí s'assumeix que si s'introdueixen coordenades planes, es necessita pyproj per a transformar-les
-            # i que l'usuari espera veure el punt convertit en el mapa.
             proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
             lon_decimal, lat_decimal = proj.transform(este, norte)
             user_coord = (lat_decimal, lon_decimal)
@@ -259,13 +264,13 @@ if st.button("🗺️ Generar Mapa"):
                 get_pixel_offset=[0, -10],
             )
             
-            # Crea la capa de puntos para la ubicació de l'usuari
+            # Crea la capa de puntos para la ubicació de l'usuari amb transparència
             user_layer = pdk.Layer(
                 "ScatterplotLayer",
                 data=user_point_df,
                 get_position=["lon", "lat"],
                 get_radius=5000, # Una mica més gran perquè es noti
-                get_fill_color=[255, 0, 0, 255], # Vermell brillant per a la ubicació de l'usuari
+                get_fill_color=[255, 0, 0, 150], # Vermell brillant per a la ubicació de l'usuari, amb transparència
                 pickable=True,
                 tooltip={"text": "{name}"}
             )
@@ -293,5 +298,23 @@ if st.button("🗺️ Generar Mapa"):
         st.warning("Asegúrate de que la URL del archivo CSV es correcta y el formato es válido, y de que el archivo contiene las columnas 'Latitud' y 'Longitud'.")
 
 st.markdown("---")
-st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
+# Secció de suggeriments amb link mailto
+st.markdown("### 💬 Dejar una sugerencia")
+suggestion_text = st.text_area("Si tienes alguna sugerencia o comentario, por favor, déjalo aquí.", height=150, key="suggestion_box")
 
+# Lógica para crear el hipervínculo de correo
+if st.button("Enviar sugerencia"):
+    if suggestion_text:
+        # Codificamos el texto para que sea seguro en una URL
+        encoded_text = urllib.parse.quote(suggestion_text)
+        
+        # Creamos el enlace 'mailto:' con el asunto y el cuerpo del mensaje
+        mailto_link = f"mailto:osirias@gmail.com?subject=Sugerencia para la Herramienta GNSS&body={encoded_text}"
+        
+        st.success("¡Sugerencia preparada! Haz clic en el siguiente enlace para abrir tu cliente de correo:")
+        st.markdown(f"**[Abrir correo y enviar sugerencia]({mailto_link})**")
+    else:
+        st.warning("Por favor, escribe algo en el cuadro de sugerencias antes de enviarlo.")
+
+st.markdown("---")
+st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
