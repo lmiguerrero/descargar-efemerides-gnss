@@ -187,17 +187,24 @@ try:
             lambda x: geodesic(user_coord, (x[1], x[0])).kilometers
         )
         df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
-
+        
+        # Crear la tabla con los datos
         st.markdown("### 📌 Estaciones más cercanas:")
-        for idx, row in df_sorted.iterrows():
-            nombre = row["Nombre Municipio"]
-            dpto = row["Nombre Departamento"]
-            lat, lon = row["LatLon"]
-            dist = row["Distancia_km"]
-            enlace = f"https://geoportal.igac.gov.co/sites/geoportal.igac.gov.co/files/archivos_gdb/GNSS/{nombre.replace(' ', '%20')}.zip"
-            st.markdown(f"- **{nombre}, {dpto}** – {dist:.2f} km – [Descargar GNSS]({enlace})")
+        
+        # Crear un DataFrame para la tabla con los datos que se van a mostrar
+        table_df = df_sorted[['ID', 'Nombre Municipio', 'Nombre Departamento', 'Norte', 'Este', 'Distancia_km']].copy()
+        
+        # Formatear la columna de distancia para mostrar solo 2 decimales
+        table_df['Distancia_km'] = table_df['Distancia_km'].apply(lambda x: f"{x:.2f} km")
 
-        # Mapa de estaciones
+        # Convertir la columna ID a hipervínculos
+        base_url = "https://www.colombiaenmapas.gov.co/?e=-70.73413803218989,4.446062377553575,-70.60178711055921,4.542923924561411,4686&b=igac&u=0&t=25&servicio=6&estacion="
+        table_df['ID'] = table_df['ID'].apply(lambda alias: f"[{alias}]({base_url}{alias})")
+
+        # Mostrar la tabla en Streamlit
+        st.markdown(table_df.to_markdown(index=False), unsafe_allow_html=True)
+
+        # Código del mapa
         st.markdown("### 🗺️ Ver mapa de estaciones")
         
         # Mapea las columnas para pydeck
