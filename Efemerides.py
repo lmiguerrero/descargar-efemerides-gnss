@@ -194,6 +194,21 @@ else:
 
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
+# Opciones de fondo de mapa para pydeck
+map_styles = {
+    "OpenStreetMap": "OpenStreetMap",
+    "CartoDB Claro (Positron)": "CartoDB positron",
+    "CartoDB Oscuro": "CartoDB dark_matter",
+    "Satélite (Esri)": "Esri.WorldImagery",
+    "Esri NatGeo World Map": "Esri.NatGeoWorldMap",
+    "Esri World Topo Map": "Esri.WorldTopoMap"
+}
+
+# Selector de fondo de mapa en la barra lateral
+selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(map_styles.keys()), index=0)
+selected_map_style_url = map_styles[selected_map_style_name]
+
+
 # ---- CONTENIDO PRINCIPAL ----
 st.subheader("🗺️ Estaciones GNSS más cercanas")
 st.markdown("Las estaciones cercanas se calculan con base en un conjunto de coordenadas de referencia.")
@@ -309,7 +324,7 @@ if st.button("🗺️ Generar Mapa"):
             st.pydeck_chart(pdk.Deck(
                 layers=[station_layer, text_layer, user_layer], 
                 initial_view_state=view_state,
-                map_style="light"  # Estilo de mapa base
+                map_style=selected_map_style_url  # Usa el estilo seleccionado por el usuario
             ))
 
         else:
