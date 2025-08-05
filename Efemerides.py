@@ -11,6 +11,7 @@ import pyproj
 import folium
 from streamlit_folium import st_folium
 import urllib.parse
+import zipfile
 
 st.set_page_config(
     page_title="Herramienta GNSS",
@@ -28,10 +29,11 @@ def calculate_gps_week_number(date):
     days_since_start = (target_date - gps_start_date).days
     gps_week = days_since_start // 7
     gps_day_of_week = days_since_start % 7
-    gps_week_number = gps_week * 10 + gps_day_of_week
+    # Este cálculo del número de semana GPS es una aproximación y a menudo se simplifica.
+    # Para el propósito de las URLs, el número de semana (gps_week) y el día del año (day_of_year) son suficientes.
     day_of_year = target_date.timetuple().tm_yday
     year = target_date.year
-    return gps_week, gps_week_number, day_of_year, year
+    return gps_week, gps_day_of_week, day_of_year, year
 
 def check_url(url):
     try:
@@ -43,6 +45,7 @@ def check_url(url):
 def download_file(url, local_path):
     try:
         response = requests.get(url, stream=True, timeout=10)
+        response.raise_for_status()  # Lanza una excepción si la respuesta es un error
         with open(local_path, 'wb') as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
@@ -51,21 +54,25 @@ def download_file(url, local_path):
         st.error(f"Error al descargar {url}: {e}")
         return False
 
-def download_efemerides(date, folder_path, download_precise, download_rapid, download_gfz):
-    gps_week, gps_week_number, day_of_year, year = calculate_gps_week_number(date)
+def download_files_for_date(date, folder_path, download_precise, download_rapid, download_gfz):
+    gps_week, gps_day_of_week, day_of_year, year = calculate_gps_week_number(date)
     files_to_download = []
+    
+    # urls igs
+    gps_week_number = gps_week * 10 + gps_day_of_week
+
     if download_precise:
         precise_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/JAX0MGXFIN_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
-        files_to_download.append((precise_url, 'Precisas JAX', 'gz'))
+        files_to_download.append((precise_url, f'Precisas JAX - {date}'))
     if download_rapid:
         rapid_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/igr{gps_week_number}.sp3.Z"
-        files_to_download.append((rapid_url, 'Rápidas', 'Z'))
+        files_to_download.append((rapid_url, f'Rápidas - {date}'))
     if download_gfz:
         gfz_url = f"http://lox.ucsd.edu/pub/products/{gps_week}/GFZ0OPSRAP_{year}{day_of_year:03d}0000_01D_05M_ORB.SP3.gz"
-        files_to_download.append((gfz_url, 'GFZ', 'gz'))
+        files_to_download.append((gfz_url, f'GFZ - {date}'))
 
     download_info = []
-    for url, label, compression_type in files_to_download:
+    for url, label in files_to_download:
         local_filename = os.path.basename(url)
         local_path = os.path.join(folder_path, local_filename)
         status = "No disponible"
@@ -74,6 +81,7 @@ def download_efemerides(date, folder_path, download_precise, download_rapid, dow
                 status = "Descargado"
             else:
                 status = "Error al descargar"
+        
         download_info.append({
             "label": label,
             "filename": local_filename,
@@ -85,36 +93,59 @@ def download_efemerides(date, folder_path, download_precise, download_rapid, dow
 st.sidebar.header("📥 Ingresar parámetros")
 
 st.sidebar.markdown("### 🗓️ Descargar Efemérides")
-selected_date = st.sidebar.date_input("Seleccionar fecha", datetime.today())
+date_range = st.sidebar.date_input("Seleccionar rango de fechas", value=(datetime.today() - timedelta(days=7), datetime.today()), max_value=datetime.today())
 download_precise = st.sidebar.checkbox("Descargar Efemérides Precisas JAX", value=True)
 download_rapid = st.sidebar.checkbox("Descargar Efemérides Rápidas", value=False)
 download_gfz = st.sidebar.checkbox("Descargar Efemérides Precisas GFZ", value=False)
 
 if st.sidebar.button("🔽 Descargar Efemérides"):
-    if not download_precise and not download_rapid and not download_gfz:
+    if not date_range or len(date_range) != 2:
+        st.sidebar.warning("Por favor, selecciona un rango de fechas válido.")
+    elif not download_precise and not download_rapid and not download_gfz:
         st.sidebar.warning("Por favor, selecciona al menos un tipo de efemérides para descargar.")
     else:
-        with st.spinner("Descargando y procesando..."):
-            tmpdir = tempfile.mkdtemp()
-            download_status = download_efemerides(selected_date, tmpdir, download_precise, download_rapid, download_gfz)
-            st.subheader("Estado de la descarga:")
-            for info in download_status:
-                if info["status"] == "Descargado":
-                    st.success(f"✅ {info['label']} ({info['filename']}) descargado.")
-                    try:
-                        with open(info['local_path'], "rb") as file:
-                            st.download_button(
-                                label=f"📄 Descargar {info['label']}",
-                                data=file,
-                                file_name=info['filename'],
-                                mime="application/octet-stream"
-                            )
-                    except Exception as e:
-                        st.error(f"Error al preparar el botón de descarga para {info['label']}: {e}")
-                else:
-                    st.warning(f"⚠️ {info['label']} ({info['filename']}): {info['status']}")
-            st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
-            shutil.rmtree(tmpdir)
+        start_date, end_date = date_range
+        delta = end_date - start_date
+        total_days = delta.days + 1
+        
+        tmpdir = tempfile.mkdtemp()
+        all_download_status = []
+        
+        st.subheader("Estado de la descarga:")
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
+        
+        for i in range(total_days):
+            current_date = start_date + timedelta(days=i)
+            status_text.text(f"Descargando efemérides para la fecha: {current_date.strftime('%Y-%m-%d')}...")
+            
+            download_status = download_files_for_date(current_date, tmpdir, download_precise, download_rapid, download_gfz)
+            all_download_status.extend(download_status)
+            
+            progress = (i + 1) / total_days
+            progress_bar.progress(progress)
+            
+        status_text.success("Descarga de efemérides finalizada. Comprimiendo archivos...")
+
+        zip_filename = f"Efemérides_{start_date.strftime('%Y-%m-%d')}_a_{end_date.strftime('%Y-%m-%d')}.zip"
+        zip_path = os.path.join(tmpdir, zip_filename)
+        
+        with zipfile.ZipFile(zip_path, 'w') as zf:
+            for item in os.listdir(tmpdir):
+                if item.endswith(('.gz', '.Z')):
+                    zf.write(os.path.join(tmpdir, item), item)
+        
+        with open(zip_path, "rb") as fp:
+            st.download_button(
+                label=f"📄 Descargar todos los archivos ({zip_filename})",
+                data=fp.read(),
+                file_name=zip_filename,
+                mime="application/zip"
+            )
+
+        st.markdown("---")
+        st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
+        shutil.rmtree(tmpdir)
 
 st.sidebar.markdown("---")
 
