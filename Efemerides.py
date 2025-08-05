@@ -13,6 +13,18 @@ from streamlit_folium import st_folium
 import urllib.parse
 import zipfile
 
+# --- CSS para el fondo de color verde muy claro ---
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #e8f5e9;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.set_page_config(
     page_title="Herramienta GNSS",
     layout="wide",
@@ -29,8 +41,6 @@ def calculate_gps_week_number(date):
     days_since_start = (target_date - gps_start_date).days
     gps_week = days_since_start // 7
     gps_day_of_week = days_since_start % 7
-    # Este cálculo del número de semana GPS es una aproximación y a menudo se simplifica.
-    # Para el propósito de las URLs, el número de semana (gps_week) y el día del año (day_of_year) son suficientes.
     day_of_year = target_date.timetuple().tm_yday
     year = target_date.year
     return gps_week, gps_day_of_week, day_of_year, year
@@ -45,7 +55,7 @@ def check_url(url):
 def download_file(url, local_path):
     try:
         response = requests.get(url, stream=True, timeout=10)
-        response.raise_for_status()  # Lanza una excepción si la respuesta es un error
+        response.raise_for_status()
         with open(local_path, 'wb') as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
@@ -58,7 +68,6 @@ def download_files_for_date(date, folder_path, download_precise, download_rapid,
     gps_week, gps_day_of_week, day_of_year, year = calculate_gps_week_number(date)
     files_to_download = []
     
-    # urls igs
     gps_week_number = gps_week * 10 + gps_day_of_week
 
     if download_precise:
@@ -143,8 +152,6 @@ if st.sidebar.button("🔽 Descargar Efemérides"):
                 mime="application/zip"
             )
 
-        st.markdown("---")
-        st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
         shutil.rmtree(tmpdir)
 
 st.sidebar.markdown("---")
@@ -288,3 +295,5 @@ st.markdown("---")
 st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
+st.markdown("---")
+st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
