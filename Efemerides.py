@@ -7,9 +7,10 @@ import requests
 import os
 import shutil
 import tempfile
-import pydeck as pdk
 import pyproj
 import urllib.parse
+import folium
+from streamlit_folium import st_folium
 
 st.set_page_config(
     page_title="Herramienta GNSS",
@@ -146,13 +147,16 @@ else:
 
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
+# --- Usamos el mismo enfoque que en tu segundo código para los tiles de Folium ---
 MAP_STYLES = {
-    "Claro": "light",
-    "Oscuro": "dark",
-    "Satélite (Esri)": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    "OpenStreetMap": "OpenStreetMap",
+    "CartoDB Claro (Positron)": "CartoDB positron",
+    "CartoDB Oscuro": "CartoDB dark_matter",
+    "Satélite (Esri)": "Esri.WorldImagery", # Estilo de satélite que funciona en Folium
 }
 selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
 selected_map_style_value = MAP_STYLES[selected_map_style_name]
+
 
 st.subheader("🗺️ Estaciones GNSS más cercanas")
 if st.button("🗺️ Generar Mapa"):
@@ -164,92 +168,46 @@ if st.button("🗺️ Generar Mapa"):
                 lambda row: geodesic(user_coord, (row['Latitud'], row['Longitud'])).kilometers, axis=1
             )
             df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
-
-            station_map_data = pd.DataFrame({
-                "lat": df_sorted["Latitud"],
-                "lon": df_sorted["Longitud"],
-                "name": df_sorted["Nombre Municipio"],
-                "id": df_sorted["Id"],
-                "department": df_sorted["Nombre Departamento"],
-                "distance": df_sorted["Distancia_km"]
-            })
-
-            user_point_df = pd.DataFrame({
-                "lat": [user_coord[0]],
-                "lon": [user_coord[1]],
-                "name": ["Ubicación del Usuario"],
-                "distance": [0.0]
-            })
-
-            # --- Código corregido para el mapa ---
-            layers = []
-            map_style_to_use = None
-
-            if selected_map_style_name == "Satélite (Esri)":
-                layers.append(pdk.Layer(
-                    "TileLayer",
-                    id="base-map",
-                    data=None,
-                    tile_size=256,
-                    minZoom=0,
-                    maxZoom=19,
-                    tile_url=selected_map_style_value
-                ))
-            else:
-                map_style_to_use = selected_map_style_value
-            # --- Fin del código corregido ---
-
-            layers.append(pdk.Layer(
-                "ScatterplotLayer",
-                data=station_map_data,
-                get_position=["lon", "lat"],
-                get_radius=3000,
-                get_fill_color=[255, 140, 0, 200],
-                pickable=True,
-                tooltip={
-                    "html": "<b>ID:</b> {id}<br/><b>Municipio:</b> {name}<br/><b>Departamento:</b> {department}",
-                    "style": {"color": "white"}
-                }
-            ))
-
-            layers.append(pdk.Layer(
-                "TextLayer",
-                data=station_map_data,
-                get_position=["lon", "lat"],
-                get_text="id",
-                get_color=[0, 0, 0, 255],
-                get_size=10,
-                get_alignment_baseline="'bottom'",
-                get_pixel_offset=[0, -10],
-            ))
-
-            layers.append(pdk.Layer(
-                "ScatterplotLayer",
-                data=user_point_df,
-                get_position=["lon", "lat"],
-                get_radius=5000,
-                get_fill_color=[255, 0, 0, 150],
-                pickable=True,
-                tooltip={"text": "{name}"}
-            ))
-
-            view_state = pdk.ViewState(
-                latitude=user_coord[0],
-                longitude=user_coord[1],
-                zoom=6,
-                pitch=0
-            )
-
-            # Usamos el diccionario para pasar los argumentos condicionalmente
-            deck_kwargs = {
-                "layers": layers,
-                "initial_view_state": view_state
-            }
-            if map_style_to_use:
-                deck_kwargs["map_style"] = map_style_to_use
-
+            
             st.markdown("### 🗺️ Ver mapa de estaciones")
-            st.pydeck_chart(pdk.Deck(**deck_kwargs))
+            
+            # --- Nuevo bloque con Folium ---
+            with st.spinner("Generando mapa..."):
+                m = folium.Map(location=[user_coord[0], user_coord[1]], zoom_start=6, tiles=selected_map_style_value)
+
+                # Añadir marcador para la ubicación del usuario (rojo)
+                folium.Marker(
+                    location=[user_coord[0], user_coord[1]],
+                    popup="Ubicación del Usuario",
+                    icon=folium.Icon(color="red", icon="info-sign")
+                ).add_to(m)
+
+                # Añadir marcadores para las estaciones GNSS (naranja)
+                for index, row in df_sorted.iterrows():
+                    popup_html = f"""
+                    <b>ID:</b> {row['Id']}<br>
+                    <b>Municipio:</b> {row['Nombre Municipio']}<br>
+                    <b>Departamento:</b> {row['Nombre Departamento']}<br>
+                    <b>Distancia:</b> {row['Distancia_km']:.2f} km
+                    """
+                    folium.Marker(
+                        location=[row['Latitud'], row['Longitud']],
+                        popup=popup_html,
+                        icon=folium.Icon(color="orange", icon="cloud")
+                    ).add_to(m)
+
+                # Ajustar el zoom para que se vean todos los puntos
+                if not df_sorted.empty:
+                    bounds = [[df_sorted['Latitud'].min(), df_sorted['Longitud'].min()], 
+                              [df_sorted['Latitud'].max(), df_sorted['Longitud'].max()]]
+                    m.fit_bounds(bounds)
+
+                st_folium(m, width=1200, height=600)
+            # --- Fin del bloque con Folium ---
+
+            st.markdown("### 📋 Estaciones cercanas")
+            st.dataframe(df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Distancia_km']])
+
         else:
             st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
     except Exception as e:
