@@ -329,7 +329,5 @@ with st.container():
 
 st.markdown("---")
 st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
-st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
-st.markdown("---")
 st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
