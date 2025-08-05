@@ -13,7 +13,7 @@ from streamlit_folium import st_folium
 import urllib.parse
 import zipfile
 
-# --- CSS para un diseño con Tarjetas ---
+# --- CSS para un diseño con Tarjetas y barra lateral más ancha ---
 st.markdown(
     """
     <style>
@@ -54,6 +54,13 @@ st.markdown(
     }
     .stButton>button:hover {
         background-color: #0056b3;
+    }
+    /* Ajustar el ancho de la barra lateral */
+    [data-testid="stSidebar"] {
+        width: 350px;
+    }
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+        width: 350px;
     }
     </style>
     """,
