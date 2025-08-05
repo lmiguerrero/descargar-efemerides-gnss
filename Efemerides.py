@@ -133,8 +133,6 @@ if coord_format == "Grados, Minutos, Segundos":
     lon_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=23, key="lon_min_input")
     lon_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=37.750000, format="%.6f", key="lon_sec_input")
     
-    # *** NUEVA CORRECCIÓN DE CÁLCULO DE COORDENADAS ***
-    # Se calcula la magnitud de cada coordenada y luego se aplica el signo.
     lat_magnitude = abs(lat_deg) + lat_min / 60 + lat_sec / 3600
     lon_magnitude = abs(lon_deg) + lon_min / 60 + lon_sec / 3600
     
@@ -235,7 +233,6 @@ if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
 
             st.markdown("### 📋 Estaciones cercanas")
             
-            # *** CÓDIGO CORREGIDO PARA LA TABLA CON HIPERVÍNCULOS ***
             st.markdown(
                 f"""
                 | ID | Nombre Municipio | Nombre Departamento | Distancia_km |
@@ -257,6 +254,6 @@ if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
         st.session_state["mostrar_mapa"] = False
 
 st.markdown("---")
-st.markdown("### 💬 Dejar una sugerencia")
+st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
 st.markdown("---")
 st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
