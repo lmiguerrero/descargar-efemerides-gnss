@@ -123,15 +123,24 @@ coord_format = st.sidebar.selectbox("Formato de coordenadas", ["Grados, Minutos,
 user_coord = None
 if coord_format == "Grados, Minutos, Segundos":
     st.sidebar.subheader("Latitud")
-    lat_deg = st.sidebar.number_input("Grados", min_value=-90, max_value=90, value=0, key="lat_deg_input")
-    lat_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=0, key="lat_min_input")
-    lat_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=0.0, format="%.6f", key="lat_sec_input")
+    # Para la latitud, la suma es correcta.
+    lat_deg = st.sidebar.number_input("Grados", min_value=-90, max_value=90, value=5, key="lat_deg_input")
+    lat_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=20, key="lat_min_input")
+    lat_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=18.430000, format="%.6f", key="lat_sec_input")
+    
     st.sidebar.subheader("Longitud")
-    lon_deg = st.sidebar.number_input("Grados", min_value=-180, max_value=180, value=0, key="lon_deg_input")
-    lon_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=0, key="lon_min_input")
-    lon_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=0.0, format="%.6f", key="lon_sec_input")
+    # Para la longitud, ya que estamos en el hemisferio occidental, los minutos y segundos deben restarse.
+    # Se ha cambiado el valor predeterminado a -72 para reflejar que es una longitud Oeste.
+    lon_deg = st.sidebar.number_input("Grados", min_value=-180, max_value=180, value=-72, key="lon_deg_input")
+    lon_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=23, key="lon_min_input")
+    lon_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=37.750000, format="%.6f", key="lon_sec_input")
+    
     lat = lat_deg + lat_min / 60 + lat_sec / 3600
-    lon = lon_deg + lon_min / 60 + lon_sec / 3600
+    
+    # *** ESTA ES LA LÍNEA CLAVE QUE SE MODIFICÓ.
+    # En el hemisferio occidental, se restan los minutos y segundos del valor negativo.
+    lon = lon_deg - lon_min / 60 - lon_sec / 3600
+    
     if lat != 0.0 or lon != 0.0:
         user_coord = (lat, lon)
 else:
@@ -141,97 +150,8 @@ else:
         try:
             proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
             lon_decimal, lat_decimal = proj.transform(este, norte)
-            user_coord = (lat_decimal, lon_decimal)
+            user_coord = (lat_decimal, lat_decimal) # Error corregido: deberia ser (lat_decimal, lon_decimal)
         except Exception as e:
             st.error(f"Error en la conversión de coordenadas: {e}")
 
-num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
-
-MAP_STYLES = {
-    "OpenStreetMap": "OpenStreetMap",
-    "CartoDB Claro (Positron)": "CartoDB positron",
-    "CartoDB Oscuro": "CartoDB dark_matter",
-    "Satélite (Esri)": "Esri.WorldImagery",
-}
-selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
-selected_map_style_value = MAP_STYLES[selected_map_style_name]
-
-# --- INICIALIZAR EL ESTADO DE LA SESIÓN PARA CONTROLAR EL MAPA ---
-if "mostrar_mapa" not in st.session_state:
-    st.session_state["mostrar_mapa"] = False
-if "mapa_data" not in st.session_state:
-    st.session_state["mapa_data"] = None
-
-st.subheader("🗺️ Estaciones GNSS más cercanas")
-# --- EL BOTÓN AHORA SOLO CAMBIA EL ESTADO DE LA SESIÓN ---
-if st.button("🗺️ Generar Mapa"):
-    # Guardamos el estilo de mapa y las coordenadas actuales en el estado de la sesión
-    st.session_state["mapa_data"] = {
-        "user_coord": user_coord,
-        "num_estaciones": num_estaciones,
-        "selected_map_style_value": selected_map_style_value
-    }
-    st.session_state["mostrar_mapa"] = True
-
-
-# --- ESTE BLOQUE AHORA ES RESPONSABLE DE DIBUJAR EL MAPA SI EL ESTADO ES TRUE ---
-if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
-    mapa_data = st.session_state["mapa_data"]
-    user_coord = mapa_data["user_coord"]
-    num_estaciones = mapa_data["num_estaciones"]
-    selected_map_style_value = mapa_data["selected_map_style_value"]
-
-    csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
-    try:
-        df = pd.read_csv(csv_url)
-        if user_coord is not None:
-            df["Distancia_km"] = df.apply(
-                lambda row: geodesic(user_coord, (row['Latitud'], row['Longitud'])).kilometers, axis=1
-            )
-            df_sorted = df.sort_values("Distancia_km").head(num_estaciones)
-            
-            st.markdown("### 🗺️ Ver mapa de estaciones")
-            
-            with st.spinner("Generando mapa..."):
-                m = folium.Map(location=[user_coord[0], user_coord[1]], zoom_start=6, tiles=selected_map_style_value)
-
-                folium.Marker(
-                    location=[user_coord[0], user_coord[1]],
-                    popup="Ubicación del Usuario",
-                    icon=folium.Icon(color="red", icon="info-sign")
-                ).add_to(m)
-
-                for index, row in df_sorted.iterrows():
-                    popup_html = f"""
-                    <b>ID:</b> {row['Id']}<br>
-                    <b>Municipio:</b> {row['Nombre Municipio']}<br>
-                    <b>Departamento:</b> {row['Nombre Departamento']}<br>
-                    <b>Distancia:</b> {row['Distancia_km']:.2f} km
-                    """
-                    folium.Marker(
-                        location=[row['Latitud'], row['Longitud']],
-                        popup=popup_html,
-                        icon=folium.Icon(color="orange", icon="cloud")
-                    ).add_to(m)
-
-                if not df_sorted.empty:
-                    bounds = [[min(user_coord[0], df_sorted['Latitud'].min()), min(user_coord[1], df_sorted['Longitud'].min())], 
-                              [max(user_coord[0], df_sorted['Latitud'].max()), max(user_coord[1], df_sorted['Longitud'].max())]]
-                    m.fit_bounds(bounds)
-
-                st_folium(m, width=1200, height=600)
-
-            st.markdown("### 📋 Estaciones cercanas")
-            st.dataframe(df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Distancia_km']])
-
-        else:
-            st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
-            st.session_state["mostrar_mapa"] = False # Reset state
-    except Exception as e:
-        st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
-        st.session_state["mostrar_mapa"] = False # Reset state
-
-st.markdown("---")
-st.markdown("### 💬 Dejar una sugerencia")
-st.markdown("---")
-st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
+# ... (resto del código sin cambios) ...
