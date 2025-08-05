@@ -317,11 +317,8 @@ with st.container():
             st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
             st.session_state["mostrar_mapa"] = False
 
-# --- Un solo contenedor para las secciones finales ---
-# Este es el cambio principal para consolidar la sección final en una sola tarjeta.
+# --- Un solo contenedor para las secciones finales (Tarjeta simple) ---
 with st.container():
     st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
-    st.markdown("---")
     st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
-    st.markdown("---")
     st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
