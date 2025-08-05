@@ -13,7 +13,7 @@ from streamlit_folium import st_folium
 import urllib.parse
 import zipfile
 
-# --- CSS para un diseño con Tarjetas y barra lateral más ancha ---
+# --- CSS para un diseño con Tarjetas, barra lateral y centrar banner ---
 st.markdown(
     """
     <style>
@@ -62,19 +62,25 @@ st.markdown(
     [data-testid="stSidebar"] [data-testid="stSidebarNav"] {
         width: 350px;
     }
+    /* Centrar la imagen del banner */
+    .stImage {
+        text-align: center;
+        margin-top: -30px; /* Ajusta este valor si necesitas más espacio arriba */
+        margin-bottom: 20px;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
 st.set_page_config(
-    page_title="Herramienta GNSS",
+    page_title="Celeste GNSS",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("📡 Herramienta GNSS - Consulta y Descarga de Efemérides IGS")
-st.markdown("---")
+# --- Banner (Imagen) ---
+st.image("https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Celeste.png")
 
 def calculate_gps_week_number(date):
     date_format = "%Y-%m-%d"
