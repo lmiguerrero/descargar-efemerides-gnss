@@ -254,7 +254,11 @@ MAP_STYLES = {
 selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
 selected_map_style_value = MAP_STYLES[selected_map_style_name]
 
-# --- Contenedor para el mapa (Tarjeta) ---
+# INICIO DEL CAMBIO IMPORTANTE: Inicializar la sesión de manera robusta
+if "mapa_data" not in st.session_state:
+    st.session_state["mapa_data"] = None
+
+# Contenedor para el mapa (Tarjeta)
 with st.container():
     st.subheader("🗺️ Estaciones GNSS más cercanas")
     if st.button("🗺️ Generar Mapa"):
@@ -263,9 +267,9 @@ with st.container():
             "num_estaciones": num_estaciones,
             "selected_map_style_value": selected_map_style_value
         }
-        st.session_state["mostrar_mapa"] = True
 
-    if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
+    # FIN DEL CAMBIO IMPORTANTE: La condición ahora solo verifica si "mapa_data" existe
+    if st.session_state["mapa_data"]:
         mapa_data = st.session_state["mapa_data"]
         user_coord = mapa_data["user_coord"]
         num_estaciones = mapa_data["num_estaciones"]
@@ -319,12 +323,10 @@ with st.container():
 
             else:
                 st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
-                st.session_state["mostrar_mapa"] = False
         except Exception as e:
             st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
-            st.session_state["mostrar_mapa"] = False
 
-# --- Un solo contenedor para las secciones finales (Tarjeta simple) ---
+# Un solo contenedor para las secciones finales (Tarjeta simple)
 with st.container():
     st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
     st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
