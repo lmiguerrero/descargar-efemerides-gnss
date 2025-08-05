@@ -10,6 +10,7 @@ import tempfile
 import pyproj
 import folium
 from streamlit_folium import st_folium
+import urllib.parse
 
 st.set_page_config(
     page_title="Herramienta GNSS",
@@ -128,17 +129,14 @@ if coord_format == "Grados, Minutos, Segundos":
     lat_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=18.430000, format="%.6f", key="lat_sec_input")
     
     st.sidebar.subheader("Longitud")
-    # Para Colombia, las longitudes son siempre negativas
     lon_deg = st.sidebar.number_input("Grados", min_value=-180, max_value=180, value=-72, key="lon_deg_input")
     lon_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=23, key="lon_min_input")
     lon_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=37.750000, format="%.6f", key="lon_sec_input")
     
-    # Cálculo de la latitud decimal (la lógica es correcta)
     lat = lat_deg + lat_min / 60 + lat_sec / 3600
     
     # *** CORRECCIÓN PRINCIPAL ***
     # Para longitudes negativas (hemisferio occidental), los minutos y segundos se restan del valor absoluto.
-    # Por ejemplo: -72° 23' 37.75" = -72 - (23/60) - (37.75/3600)
     lon = lon_deg - (lon_min / 60) - (lon_sec / 3600)
     
     if lat != 0.0 or lon != 0.0:
@@ -150,7 +148,7 @@ else:
         try:
             proj = pyproj.Transformer.from_crs("EPSG:3116", "EPSG:4326", always_xy=True)
             lon_decimal, lat_decimal = proj.transform(este, norte)
-            user_coord = (lat_decimal, lon_decimal) # Corregido: Debe ser (latitud, longitud)
+            user_coord = (lat_decimal, lon_decimal)
         except Exception as e:
             st.error(f"Error en la conversión de coordenadas: {e}")
 
@@ -165,16 +163,13 @@ MAP_STYLES = {
 selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
 selected_map_style_value = MAP_STYLES[selected_map_style_name]
 
-# --- INICIALIZAR EL ESTADO DE LA SESIÓN PARA CONTROLAR EL MAPA ---
 if "mostrar_mapa" not in st.session_state:
     st.session_state["mostrar_mapa"] = False
 if "mapa_data" not in st.session_state:
     st.session_state["mapa_data"] = None
 
 st.subheader("🗺️ Estaciones GNSS más cercanas")
-# --- EL BOTÓN AHORA SOLO CAMBIA EL ESTADO DE LA SESIÓN ---
 if st.button("🗺️ Generar Mapa"):
-    # Guardamos el estilo de mapa y las coordenadas actuales en el estado de la sesión
     st.session_state["mapa_data"] = {
         "user_coord": user_coord,
         "num_estaciones": num_estaciones,
@@ -182,8 +177,6 @@ if st.button("🗺️ Generar Mapa"):
     }
     st.session_state["mostrar_mapa"] = True
 
-
-# --- ESTE BLOQUE AHORA ES RESPONSABLE DE DIBUJAR EL MAPA SI EL ESTADO ES TRUE ---
 if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
     mapa_data = st.session_state["mapa_data"]
     user_coord = mapa_data["user_coord"]
@@ -211,8 +204,13 @@ if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
                 ).add_to(m)
 
                 for index, row in df_sorted.iterrows():
+                    # *** ADAPTACIÓN DE LA FUNCIÓN DE TU CÓDIGO DE TKINTER ***
+                    # Se crea la URL del IGAC usando el ID de la estación.
+                    # El URL está ajustado para que sea genérico para cualquier estación.
+                    igac_url = f"https://www.colombiaenmapas.gov.co/?e={row['Longitud'] - 0.1},{row['Latitud'] - 0.1},{row['Longitud'] + 0.1},{row['Latitud'] + 0.1},4686&b=igac&u=0&t=25&servicio=6&estacion={row['Id']}"
+
                     popup_html = f"""
-                    <b>ID:</b> {row['Id']}<br>
+                    <b>ID:</b> <a href="{igac_url}" target="_blank">{row['Id']}</a><br>
                     <b>Municipio:</b> {row['Nombre Municipio']}<br>
                     <b>Departamento:</b> {row['Nombre Departamento']}<br>
                     <b>Distancia:</b> {row['Distancia_km']:.2f} km
@@ -231,14 +229,21 @@ if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
                 st_folium(m, width=1200, height=600)
 
             st.markdown("### 📋 Estaciones cercanas")
-            st.dataframe(df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Distancia_km']])
-
+            
+            # *** ADAPTACIÓN DE LA FUNCIÓN DE TU CÓDIGO DE TKINTER PARA LA TABLA ***
+            # Se crea una nueva columna con el hipervínculo para la tabla de resultados.
+            df_sorted['Link IGAC'] = df_sorted.apply(
+                lambda row: f"https://www.colombiaenmapas.gov.co/?e={row['Longitud'] - 0.1},{row['Latitud'] - 0.1},{row['Longitud'] + 0.1},{row['Latitud'] + 0.1},4686&b=igac&u=0&t=25&servicio=6&estacion={row['Id']}",
+                axis=1
+            )
+            
+            st.dataframe(df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Distancia_km', 'Link IGAC']])
         else:
             st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
-            st.session_state["mostrar_mapa"] = False # Reset state
+            st.session_state["mostrar_mapa"] = False
     except Exception as e:
         st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
-        st.session_state["mostrar_mapa"] = False # Reset state
+        st.session_state["mostrar_mapa"] = False
 
 st.markdown("---")
 st.markdown("### 💬 Dejar una sugerencia")
