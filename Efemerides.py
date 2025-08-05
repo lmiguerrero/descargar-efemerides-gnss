@@ -141,7 +141,7 @@ def download_files_for_date(date, folder_path, download_precise, download_rapid,
         })
     return download_info
 
-# --- Barra lateral ---
+# --- Barra lateral (Solo Efemérides) ---
 st.sidebar.header("📥 Ingresar parámetros")
 
 # --- Contenedor para parámetros de descarga (Tarjeta) ---
@@ -200,8 +200,8 @@ with st.sidebar.container():
 
 st.sidebar.markdown("---")
 
-# --- Contenedor para parámetros de coordenadas (Tarjeta) ---
-with st.sidebar.container():
+# --- Contenedor para la entrada de coordenadas (Tarjeta en el área principal) ---
+with st.container():
     st.subheader("📍 Coordenadas para búsqueda de estaciones")
     coord_format = st.selectbox("Formato de coordenadas", ["Grados, Minutos, Segundos", "Origen Nacional"])
     user_coord = None
@@ -245,20 +245,20 @@ with st.sidebar.container():
 
     num_estaciones = st.slider("Número de estaciones cercanas", 1, 10, 5)
 
-MAP_STYLES = {
-    "OpenStreetMap": "OpenStreetMap",
-    "CartoDB Claro (Positron)": "CartoDB positron",
-    "CartoDB Oscuro": "CartoDB dark_matter",
-    "Satélite (Esri)": "Esri.WorldImagery",
-}
-selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
-selected_map_style_value = MAP_STYLES[selected_map_style_name]
+    MAP_STYLES = {
+        "OpenStreetMap": "OpenStreetMap",
+        "CartoDB Claro (Positron)": "CartoDB positron",
+        "CartoDB Oscuro": "CartoDB dark_matter",
+        "Satélite (Esri)": "Esri.WorldImagery",
+    }
+    selected_map_style_name = st.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
+    selected_map_style_value = MAP_STYLES[selected_map_style_name]
 
-# INICIO DEL CAMBIO IMPORTANTE: Inicializar la sesión de manera robusta
+
+# --- Contenedor para el mapa (Tarjeta) ---
 if "mapa_data" not in st.session_state:
     st.session_state["mapa_data"] = None
 
-# Contenedor para el mapa (Tarjeta)
 with st.container():
     st.subheader("🗺️ Estaciones GNSS más cercanas")
     if st.button("🗺️ Generar Mapa"):
@@ -268,7 +268,6 @@ with st.container():
             "selected_map_style_value": selected_map_style_value
         }
 
-    # FIN DEL CAMBIO IMPORTANTE: La condición ahora solo verifica si "mapa_data" existe
     if st.session_state["mapa_data"]:
         mapa_data = st.session_state["mapa_data"]
         user_coord = mapa_data["user_coord"]
