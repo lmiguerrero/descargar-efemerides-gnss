@@ -147,19 +147,40 @@ else:
 
 num_estaciones = st.sidebar.slider("Número de estaciones cercanas", 1, 10, 5)
 
-# --- Usamos el mismo enfoque que en tu segundo código para los tiles de Folium ---
 MAP_STYLES = {
     "OpenStreetMap": "OpenStreetMap",
     "CartoDB Claro (Positron)": "CartoDB positron",
     "CartoDB Oscuro": "CartoDB dark_matter",
-    "Satélite (Esri)": "Esri.WorldImagery", # Estilo de satélite que funciona en Folium
+    "Satélite (Esri)": "Esri.WorldImagery",
 }
 selected_map_style_name = st.sidebar.selectbox("🗺️ Fondo del mapa", list(MAP_STYLES.keys()))
 selected_map_style_value = MAP_STYLES[selected_map_style_name]
 
+# --- INICIALIZAR EL ESTADO DE LA SESIÓN PARA CONTROLAR EL MAPA ---
+if "mostrar_mapa" not in st.session_state:
+    st.session_state["mostrar_mapa"] = False
+if "mapa_data" not in st.session_state:
+    st.session_state["mapa_data"] = None
 
 st.subheader("🗺️ Estaciones GNSS más cercanas")
+# --- EL BOTÓN AHORA SOLO CAMBIA EL ESTADO DE LA SESIÓN ---
 if st.button("🗺️ Generar Mapa"):
+    # Guardamos el estilo de mapa y las coordenadas actuales en el estado de la sesión
+    st.session_state["mapa_data"] = {
+        "user_coord": user_coord,
+        "num_estaciones": num_estaciones,
+        "selected_map_style_value": selected_map_style_value
+    }
+    st.session_state["mostrar_mapa"] = True
+
+
+# --- ESTE BLOQUE AHORA ES RESPONSABLE DE DIBUJAR EL MAPA SI EL ESTADO ES TRUE ---
+if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
+    mapa_data = st.session_state["mapa_data"]
+    user_coord = mapa_data["user_coord"]
+    num_estaciones = mapa_data["num_estaciones"]
+    selected_map_style_value = mapa_data["selected_map_style_value"]
+
     csv_url = "https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Coordenadas.csv"
     try:
         df = pd.read_csv(csv_url)
@@ -171,18 +192,15 @@ if st.button("🗺️ Generar Mapa"):
             
             st.markdown("### 🗺️ Ver mapa de estaciones")
             
-            # --- Nuevo bloque con Folium ---
             with st.spinner("Generando mapa..."):
                 m = folium.Map(location=[user_coord[0], user_coord[1]], zoom_start=6, tiles=selected_map_style_value)
 
-                # Añadir marcador para la ubicación del usuario (rojo)
                 folium.Marker(
                     location=[user_coord[0], user_coord[1]],
                     popup="Ubicación del Usuario",
                     icon=folium.Icon(color="red", icon="info-sign")
                 ).add_to(m)
 
-                # Añadir marcadores para las estaciones GNSS (naranja)
                 for index, row in df_sorted.iterrows():
                     popup_html = f"""
                     <b>ID:</b> {row['Id']}<br>
@@ -196,22 +214,22 @@ if st.button("🗺️ Generar Mapa"):
                         icon=folium.Icon(color="orange", icon="cloud")
                     ).add_to(m)
 
-                # Ajustar el zoom para que se vean todos los puntos
                 if not df_sorted.empty:
-                    bounds = [[df_sorted['Latitud'].min(), df_sorted['Longitud'].min()], 
-                              [df_sorted['Latitud'].max(), df_sorted['Longitud'].max()]]
+                    bounds = [[min(user_coord[0], df_sorted['Latitud'].min()), min(user_coord[1], df_sorted['Longitud'].min())], 
+                              [max(user_coord[0], df_sorted['Latitud'].max()), max(user_coord[1], df_sorted['Longitud'].max())]]
                     m.fit_bounds(bounds)
 
                 st_folium(m, width=1200, height=600)
-            # --- Fin del bloque con Folium ---
 
             st.markdown("### 📋 Estaciones cercanas")
             st.dataframe(df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Distancia_km']])
 
         else:
             st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
+            st.session_state["mostrar_mapa"] = False # Reset state
     except Exception as e:
         st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
+        st.session_state["mostrar_mapa"] = False # Reset state
 
 st.markdown("---")
 st.markdown("### 💬 Dejar una sugerencia")
