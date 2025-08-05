@@ -1,0 +1,7 @@
+Ini, TOML
+
+[theme]
+base="light"
+
+[browser]
+gatherUsageStats = false
