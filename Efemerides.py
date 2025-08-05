@@ -181,7 +181,10 @@ if st.button("🗺️ Generar Mapa"):
                 "distance": [0.0]
             })
 
+            # --- Código corregido para el mapa ---
             layers = []
+            map_style_to_use = None
+
             if selected_map_style_name == "Satélite (Esri)":
                 layers.append(pdk.Layer(
                     "TileLayer",
@@ -192,9 +195,9 @@ if st.button("🗺️ Generar Mapa"):
                     maxZoom=19,
                     tile_url=selected_map_style_value
                 ))
-                map_style = None
             else:
-                map_style = selected_map_style_value
+                map_style_to_use = selected_map_style_value
+            # --- Fin del código corregido ---
 
             layers.append(pdk.Layer(
                 "ScatterplotLayer",
@@ -237,12 +240,13 @@ if st.button("🗺️ Generar Mapa"):
                 pitch=0
             )
 
+            # Usamos el diccionario para pasar los argumentos condicionalmente
             deck_kwargs = {
                 "layers": layers,
                 "initial_view_state": view_state
             }
-            if map_style is not None:
-                deck_kwargs["map_style"] = map_style
+            if map_style_to_use:
+                deck_kwargs["map_style"] = map_style_to_use
 
             st.markdown("### 🗺️ Ver mapa de estaciones")
             st.pydeck_chart(pdk.Deck(**deck_kwargs))
