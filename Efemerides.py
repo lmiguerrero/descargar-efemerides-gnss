@@ -316,10 +316,6 @@ with st.container():
                 df_display.rename(columns={'Distancia_km': 'Distancia (km)'}, inplace=True)
                 st.dataframe(df_display, use_container_width=True)
 
-                # Si quieres los enlaces en la tabla, se puede hacer con la columna y estilo CSS
-                # df_display['Id'] = df_display['Id'].apply(lambda x: f"<a href='https://www.colombiaenmapas.gov.co/?e={row['Longitud']-0.1},{row['Latitud']-0.1},{row['Longitud']+0.1},{row['Latitud']+0.1},4686&b=igac&u=0&t=25&servicio=6&estacion={x}' target='_blank'>{x}</a>")
-                # st.markdown(df_display.to_html(escape=False), unsafe_allow_html=True)
-
             else:
                 st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
                 st.session_state["mostrar_mapa"] = False
@@ -327,7 +323,16 @@ with st.container():
             st.error(f"Error al cargar o procesar los datos de las estaciones: {e}")
             st.session_state["mostrar_mapa"] = False
 
-st.markdown("---")
-st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
-("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
-("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
+# --- Un solo contenedor para las secciones finales (Tarjetas) ---
+with st.container():
+    st.subheader("Contacto y Sugerencias")
+    st.markdown("---")
+    st.write("¿Te gustaría dejar una sugerencia o comentario?")
+    st.markdown(
+        """
+        ---
+        Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co
+        ---
+        """
+    )
+    st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
