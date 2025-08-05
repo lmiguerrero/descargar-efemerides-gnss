@@ -143,8 +143,6 @@ def download_files_for_date(date, folder_path, download_precise, download_rapid,
 
 # --- Barra lateral (Solo Efemérides) ---
 st.sidebar.header("📥 Ingresar parámetros")
-
-# --- Contenedor para parámetros de descarga (Tarjeta) ---
 with st.sidebar.container():
     st.subheader("🗓️ Descargar Efemérides")
     date_range = st.date_input("Seleccionar rango de fechas", value=(datetime.today() - timedelta(days=7), datetime.today()), max_value=datetime.today())
@@ -208,14 +206,22 @@ with st.container():
 
     if coord_format == "Grados, Minutos, Segundos":
         st.subheader("Latitud")
-        lat_deg = st.number_input("Grados", min_value=-90, max_value=90, value=5, key="lat_deg_input")
-        lat_min = st.number_input("Minutos", min_value=0, max_value=59, value=20, key="lat_min_input")
-        lat_sec = st.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=18.430000, format="%.6f", key="lat_sec_input")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            lat_deg = st.number_input("Grados", min_value=-90, max_value=90, value=5, key="lat_deg_input")
+        with col2:
+            lat_min = st.number_input("Minutos", min_value=0, max_value=59, value=20, key="lat_min_input")
+        with col3:
+            lat_sec = st.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=18.430000, format="%.6f", key="lat_sec_input")
         
         st.subheader("Longitud")
-        lon_deg = st.number_input("Grados", min_value=-180, max_value=180, value=-72, key="lon_deg_input")
-        lon_min = st.number_input("Minutos", min_value=0, max_value=59, value=23, key="lon_min_input")
-        lon_sec = st.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=37.750000, format="%.6f", key="lon_sec_input")
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            lon_deg = st.number_input("Grados", min_value=-180, max_value=180, value=-72, key="lon_deg_input")
+        with col5:
+            lon_min = st.number_input("Minutos", min_value=0, max_value=59, value=23, key="lon_min_input")
+        with col6:
+            lon_sec = st.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=37.750000, format="%.6f", key="lon_sec_input")
         
         lat_magnitude = abs(lat_deg) + lat_min / 60 + lat_sec / 3600
         lon_magnitude = abs(lon_deg) + lon_min / 60 + lon_sec / 3600
