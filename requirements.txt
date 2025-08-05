@@ -5,3 +5,4 @@ geopy
 requests
 pyproj
 pydeck
+folium
