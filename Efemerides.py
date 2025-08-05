@@ -133,11 +133,20 @@ if coord_format == "Grados, Minutos, Segundos":
     lon_min = st.sidebar.number_input("Minutos", min_value=0, max_value=59, value=23, key="lon_min_input")
     lon_sec = st.sidebar.number_input("Segundos (con decimales)", min_value=0.0, max_value=59.999999, value=37.750000, format="%.6f", key="lon_sec_input")
     
-    lat = lat_deg + lat_min / 60 + lat_sec / 3600
+    # *** NUEVA CORRECCIÓN DE CÁLCULO DE COORDENADAS ***
+    # Se calcula la magnitud de cada coordenada y luego se aplica el signo.
+    lat_magnitude = abs(lat_deg) + lat_min / 60 + lat_sec / 3600
+    lon_magnitude = abs(lon_deg) + lon_min / 60 + lon_sec / 3600
     
-    # *** CORRECCIÓN PRINCIPAL ***
-    # Para longitudes negativas (hemisferio occidental), los minutos y segundos se restan del valor absoluto.
-    lon = lon_deg - (lon_min / 60) - (lon_sec / 3600)
+    if lat_deg < 0:
+        lat = -lat_magnitude
+    else:
+        lat = lat_magnitude
+        
+    if lon_deg < 0:
+        lon = -lon_magnitude
+    else:
+        lon = lon_magnitude
     
     if lat != 0.0 or lon != 0.0:
         user_coord = (lat, lon)
@@ -204,11 +213,7 @@ if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
                 ).add_to(m)
 
                 for index, row in df_sorted.iterrows():
-                    # *** ADAPTACIÓN DE LA FUNCIÓN DE TU CÓDIGO DE TKINTER ***
-                    # Se crea la URL del IGAC usando el ID de la estación.
-                    # El URL está ajustado para que sea genérico para cualquier estación.
                     igac_url = f"https://www.colombiaenmapas.gov.co/?e={row['Longitud'] - 0.1},{row['Latitud'] - 0.1},{row['Longitud'] + 0.1},{row['Latitud'] + 0.1},4686&b=igac&u=0&t=25&servicio=6&estacion={row['Id']}"
-
                     popup_html = f"""
                     <b>ID:</b> <a href="{igac_url}" target="_blank">{row['Id']}</a><br>
                     <b>Municipio:</b> {row['Nombre Municipio']}<br>
@@ -230,14 +235,20 @@ if st.session_state["mostrar_mapa"] and st.session_state["mapa_data"]:
 
             st.markdown("### 📋 Estaciones cercanas")
             
-            # *** ADAPTACIÓN DE LA FUNCIÓN DE TU CÓDIGO DE TKINTER PARA LA TABLA ***
-            # Se crea una nueva columna con el hipervínculo para la tabla de resultados.
-            df_sorted['Link IGAC'] = df_sorted.apply(
-                lambda row: f"https://www.colombiaenmapas.gov.co/?e={row['Longitud'] - 0.1},{row['Latitud'] - 0.1},{row['Longitud'] + 0.1},{row['Latitud'] + 0.1},4686&b=igac&u=0&t=25&servicio=6&estacion={row['Id']}",
-                axis=1
+            # *** CÓDIGO CORREGIDO PARA LA TABLA CON HIPERVÍNCULOS ***
+            st.markdown(
+                f"""
+                | ID | Nombre Municipio | Nombre Departamento | Distancia_km |
+                | :--- | :--- | :--- | :--- |
+                """
             )
             
-            st.dataframe(df_sorted[['Id', 'Nombre Municipio', 'Nombre Departamento', 'Distancia_km', 'Link IGAC']])
+            for index, row in df_sorted.iterrows():
+                igac_url = f"https://www.colombiaenmapas.gov.co/?e={row['Longitud'] - 0.1},{row['Latitud'] - 0.1},{row['Longitud'] + 0.1},{row['Latitud'] + 0.1},4686&b=igac&u=0&t=25&servicio=6&estacion={row['Id']}"
+                st.markdown(
+                    f"| <a href='{igac_url}' target='_blank'>{row['Id']}</a> | {row['Nombre Municipio']} | {row['Nombre Departamento']} | {row['Distancia_km']:.2f} |",
+                    unsafe_allow_html=True
+                )
         else:
             st.error("Por favor, ingresa una coordenada válida para generar el mapa.")
             st.session_state["mostrar_mapa"] = False
