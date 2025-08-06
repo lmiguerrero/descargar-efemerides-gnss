@@ -80,7 +80,7 @@ st.set_page_config(
 )
 
 # --- Banner (Imagen) ---
-st.image("https://raw.githubusercontent.com/lmiguerrero/descargar-efemerides-gnss/main/Celeste.png")
+st.image("https://iili.io/FidmiBe.png")
 
 def calculate_gps_week_number(date):
     date_format = "%Y-%m-%d"
