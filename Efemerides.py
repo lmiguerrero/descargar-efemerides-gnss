@@ -340,5 +340,5 @@ with st.container():
 # Un solo contenedor para las secciones finales (Tarjeta simple)
 with st.container():
     st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
-    st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co")
+    st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co" | Apoyame: https://ko-fi.com/osirias)
     st.info("Confío en que este programa le será de gran utilidad y cumpla con sus expectativas.")
