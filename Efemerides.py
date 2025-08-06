@@ -341,5 +341,5 @@ with st.container():
 with st.container():
     st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
     st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co | Apoyame: https://ko-fi.com/osirias" )
-    st.info("¿Te es de utilidad la pagina? ¿Te gustaria invitarme un café? Este es mi codigo de NEQUI: $$$ ")
-    st.image("https://iili.io/FiCdWfj.jpg", width=150)
+    st.info("¿Te es de utilidad la pagina? ¿Te gustaria invitarme un café? Este es mi codigo de NEQUI: $$$ "), st.image("https://iili.io/FiCdWfj.jpg", width=150)
+    
