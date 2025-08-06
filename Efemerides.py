@@ -342,4 +342,4 @@ with st.container():
     st.markdown("### ¿Te gustaría dejar una sugerencia o comentario?")
     st.markdown("Luis Miguel Guerrero Ing Topográfico Universidad Distrital | Contacto: lmguerrerov@udistrital.edu.co | Apoyame: https://ko-fi.com/osirias" )
     st.info("¿Te es de utilidad la pagina? ¿Quieres hacer una donación por Nequi?")
-    st.image("https://iili.io/FiCdWfj.jpg", width=200)
+    st.image("https://iili.io/FiCdWfj.jpg", width=300)
