@@ -15,7 +15,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Usamos las variables nativas de Streamlit para que se adapte al modo oscuro o claro */
     .block-container {
         background-color: var(--secondary-background-color);
         padding: 3rem 3rem;
@@ -116,7 +115,8 @@ with col_logo2:
 
 st.title("Celeste")
 
-st.write("### Descargar Efemérides GNSS")
+st.write("### Herramienta para descarga de efemérides precisas y rápidas")
+st.write("Selecciona el intervalo de fechas para realizar la búsqueda de las efemérides en los servidores del archivo GARNER de la Universidad de California, San Diego (UCSD). El sistema procesará tu solicitud y empaquetará los archivos SP3 disponibles en un único archivo comprimido para facilitar su uso en tu software de postproceso GNSS.")
 
 date_range = st.date_input(
     "Seleccionar rango de fechas", 
@@ -177,3 +177,5 @@ if st.button("Descargar Efemérides"):
             )
         
         shutil.rmtree(tmpdir)
+
+st.markdown("<br><hr><center><small>Diseñado por Ing. Luis Miguel Guerrero Varona | lmguerrerov@outlook.com | Todos los derechos reservados &copy; 2026</small></center>", unsafe_allow_html=True)
