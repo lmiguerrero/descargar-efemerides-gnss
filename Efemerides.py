@@ -15,6 +15,10 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
     .block-container {
         background-color: var(--secondary-background-color);
         padding: 3rem 3rem;
