@@ -15,14 +15,12 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .stApp {
-        background-color: #f4f7f9;
-    }
+    /* Usamos las variables nativas de Streamlit para que se adapte al modo oscuro o claro */
     .block-container {
-        background-color: #ffffff;
+        background-color: var(--secondary-background-color);
         padding: 3rem 3rem;
         border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         margin-top: 3rem;
         margin-bottom: 3rem;
         max-width: 750px;
@@ -40,7 +38,7 @@ st.markdown(
     }
     h1 {
         text-align: center;
-        color: #1e293b;
+        color: var(--text-color);
         padding-bottom: 10px;
     }
     </style>
