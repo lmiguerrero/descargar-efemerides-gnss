@@ -18,13 +18,14 @@ st.markdown(
     .stApp {
         background-color: #f4f7f9;
     }
-    .main-card {
+    .block-container {
         background-color: #ffffff;
-        padding: 40px;
+        padding: 3rem 3rem;
         border-radius: 15px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        border: 1px solid #e0e6ed;
-        margin-top: 20px;
+        margin-top: 3rem;
+        margin-bottom: 3rem;
+        max-width: 750px;
     }
     .stButton>button {
         width: 100%;
@@ -32,11 +33,15 @@ st.markdown(
         color: white;
         border-radius: 8px;
         padding: 12px;
-        font-weight: 600;
+        font-size: 16px;
+    }
+    .stButton>button:hover {
+        background-color: #0056b3;
     }
     h1 {
         text-align: center;
         color: #1e293b;
+        padding-bottom: 10px;
     }
     </style>
     """,
@@ -107,74 +112,70 @@ def download_files_for_date(date, folder_path, download_precise, download_rapid,
         })
     return download_info
 
-
-col_logo1, col_logo2, col_logo3 = st.columns([1, 1, 1])
+col_logo1, col_logo2, col_logo3 = st.columns([1, 1.5, 1])
 with col_logo2:
-    st.image("https://fupad.pythonanywhere.com/static/efemerides.jpg", width=250)
+    st.image("https://fupad.pythonanywhere.com/static/efemerides.jpg", use_container_width=True)
 
 st.title("Celeste")
 
-with st.container():
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
-    
-    st.subheader("Descargar Efemérides GNSS")
-    
-    date_range = st.date_input(
-        "Seleccionar rango de fechas", 
-        value=(datetime.today() - timedelta(days=7), datetime.today()), 
-        max_value=datetime.today()
-    )
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        download_precise = st.checkbox("Efemérides Precisas JAX", value=True)
-        download_rapid = st.checkbox("Efemérides Rápidas", value=False)
-    with col2:
-        download_gfz = st.checkbox("Efemérides Precisas GFZ", value=False)
+st.write("### Descargar Efemérides GNSS")
 
-    if st.button("Descargar Efemérides"):
-        if not date_range or len(date_range) != 2:
-            st.error("Selecciona un rango válido.")
-        elif not download_precise and not download_rapid and not download_gfz:
-            st.warning("Selecciona al menos un tipo de efemérides para descargar.")
-        else:
-            start_date, end_date = date_range
-            delta = end_date - start_date
-            total_days = delta.days + 1
+date_range = st.date_input(
+    "Seleccionar rango de fechas", 
+    value=(datetime.today() - timedelta(days=7), datetime.today()), 
+    max_value=datetime.today()
+)
+
+col_op1, col_op2 = st.columns(2)
+with col_op1:
+    download_precise = st.checkbox("Efemérides Precisas JAX", value=True)
+    download_rapid = st.checkbox("Efemérides Rápidas", value=False)
+with col_op2:
+    download_gfz = st.checkbox("Efemérides Precisas GFZ", value=False)
+
+st.write("") 
+
+if st.button("Descargar Efemérides"):
+    if not date_range or len(date_range) != 2:
+        st.error("Selecciona un rango válido.")
+    elif not download_precise and not download_rapid and not download_gfz:
+        st.warning("Selecciona al menos un tipo de efemérides para descargar.")
+    else:
+        start_date, end_date = date_range
+        delta = end_date - start_date
+        total_days = delta.days + 1
+        
+        tmpdir = tempfile.mkdtemp()
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
+        
+        all_download_status = []
+        
+        for i in range(total_days):
+            current_date = start_date + timedelta(days=i)
+            status_text.text(f"Descargando datos para: {current_date.strftime('%Y-%m-%d')}...")
             
-            tmpdir = tempfile.mkdtemp()
-            progress_bar = st.progress(0.0)
-            status_text = st.empty()
+            download_status = download_files_for_date(current_date, tmpdir, download_precise, download_rapid, download_gfz)
+            all_download_status.extend(download_status)
             
-            all_download_status = []
-            
-            for i in range(total_days):
-                current_date = start_date + timedelta(days=i)
-                status_text.text(f"Descargando datos para: {current_date.strftime('%Y-%m-%d')}...")
-                
-                download_status = download_files_for_date(current_date, tmpdir, download_precise, download_rapid, download_gfz)
-                all_download_status.extend(download_status)
-                
-                progress_bar.progress((i + 1) / total_days)
-            
-            status_text.success("Descarga finalizada. Preparando archivo...")
-            
-            zip_filename = f"Efemerides_{start_date.strftime('%Y-%m-%d')}_a_{end_date.strftime('%Y-%m-%d')}.zip"
-            zip_path = os.path.join(tmpdir, zip_filename)
-            
-            with zipfile.ZipFile(zip_path, 'w') as zf:
-                for item in os.listdir(tmpdir):
-                    if item.endswith(('.gz', '.Z')):
-                        zf.write(os.path.join(tmpdir, item), item)
-            
-            with open(zip_path, "rb") as fp:
-                st.download_button(
-                    label=f"Guardar archivo ZIP ({zip_filename})",
-                    data=fp.read(),
-                    file_name=zip_filename,
-                    mime="application/zip"
-                )
-            
-            shutil.rmtree(tmpdir)
-            
-    st.markdown('</div>', unsafe_allow_html=True)
+            progress_bar.progress((i + 1) / total_days)
+        
+        status_text.success("Descarga finalizada. Preparando archivo...")
+        
+        zip_filename = f"Efemerides_{start_date.strftime('%Y-%m-%d')}_a_{end_date.strftime('%Y-%m-%d')}.zip"
+        zip_path = os.path.join(tmpdir, zip_filename)
+        
+        with zipfile.ZipFile(zip_path, 'w') as zf:
+            for item in os.listdir(tmpdir):
+                if item.endswith(('.gz', '.Z')):
+                    zf.write(os.path.join(tmpdir, item), item)
+        
+        with open(zip_path, "rb") as fp:
+            st.download_button(
+                label=f"Guardar archivo ZIP ({zip_filename})",
+                data=fp.read(),
+                file_name=zip_filename,
+                mime="application/zip"
+            )
+        
+        shutil.rmtree(tmpdir)
